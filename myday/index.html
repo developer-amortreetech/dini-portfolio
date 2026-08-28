@@ -57,64 +57,83 @@
   .checkbox-ring.done{ background:var(--ink); border-color:var(--ink); }
   .checkbox-ring.done svg{ stroke:#050505; }
 
-  .status-dot{ width:6px; height:6px; border-radius:9999px; }
-
-  @media (max-width: 480px){
-    .safe-bottom{ padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .task-card.now{
+    border-color: rgba(255,255,255,0.4);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 8px 30px rgba(255,255,255,0.06);
   }
+  .now-badge{
+    font-size:9px; letter-spacing:0.12em; padding:2px 7px; border-radius:9999px;
+    background:#f5f5f3; color:#050505; font-weight:600;
+  }
+  .pulse-dot{ width:6px; height:6px; border-radius:9999px; background:#f5f5f3; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+  .quick-log-btn{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; padding:5px 9px; border-radius:9999px;
+    border:1px solid var(--glass-border); color:var(--ink-dim);
+  }
+  .quick-log-btn:active{ transform: scale(0.92); }
+
+  .week-bar{ width:100%; border-radius:6px 6px 3px 3px; background:rgba(255,255,255,0.1); position:relative; overflow:hidden; }
+  .week-bar-fill{ position:absolute; bottom:0; left:0; right:0; background:#f5f5f3; border-radius:6px 6px 3px 3px; }
+
+  #toast{ transform: translateY(120%); }
+  #syncDot{ box-shadow:0 0 0 2px var(--bg); }
 </style>
 </head>
 <body class="min-h-screen relative">
 
   <div class="blob-field" id="blobField"></div>
 
-  <!-- App shell -->
   <div class="relative z-10 max-w-md mx-auto min-h-screen flex flex-col px-4 pt-6">
 
-    <!-- Header -->
     <header class="flex items-center justify-between mb-5">
       <div>
-        <p class="text-[11px] tracking-[0.2em] uppercase font-mono text-ink-dim" style="color:var(--ink-dimmer)" id="dateLabel">—</p>
+        <p class="text-[11px] tracking-[0.2em] uppercase font-mono" style="color:var(--ink-dimmer)" id="dateLabel">—</p>
         <h1 class="font-display text-2xl font-semibold tracking-tight">Dini</h1>
       </div>
       <div class="flex items-center gap-2">
-        <div class="glass rounded-full w-11 h-11 flex items-center justify-center relative" id="progressRing">
+        <div class="glass rounded-full w-11 h-11 flex items-center justify-center relative">
           <svg width="40" height="40" viewBox="0 0 40 40" class="absolute">
             <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
             <circle id="progressArc" cx="20" cy="20" r="17" fill="none" stroke="#f5f5f3" stroke-width="3" stroke-linecap="round" stroke-dasharray="106.8" stroke-dashoffset="106.8" transform="rotate(-90 20 20)"/>
           </svg>
           <span id="progressPct" class="font-mono text-[10px] relative">0%</span>
         </div>
-        <button id="settingsBtn" class="glass rounded-full w-11 h-11 flex items-center justify-center active:scale-90 transition-transform">
+        <button id="settingsBtn" class="glass rounded-full w-11 h-11 flex items-center justify-center active:scale-90 transition-transform relative">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span id="syncDot" class="hidden absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-white"></span>
         </button>
       </div>
     </header>
 
-    <!-- Tabs -->
     <div class="glass rounded-2xl p-1 flex relative mb-5">
       <div id="tabIndicator" class="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl glass-strong tab-underline"></div>
       <button data-tab="timetable" class="tab-btn flex-1 py-2.5 text-sm font-medium relative z-10 font-display">Timetable</button>
       <button data-tab="clients" class="tab-btn flex-1 py-2.5 text-sm font-medium relative z-10 font-display" style="color:var(--ink-dim)">Client Tasks</button>
     </div>
 
-    <!-- Views -->
     <main class="flex-1 pb-32">
       <div id="view-timetable"></div>
       <div id="view-clients" class="hidden"></div>
     </main>
   </div>
 
-  <!-- Floating Add Button (Client Tasks only) -->
   <button id="fabAdd" class="hidden fixed bottom-8 right-1/2 translate-x-[calc(50%+120px)] z-20 glass-strong rounded-full w-16 h-16 items-center justify-center shadow-2xl active:scale-90 transition-transform">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
 
-  <!-- Add Task Modal -->
-  <div id="modalOverlay" class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-4">
+  <!-- Toast (undo) -->
+  <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 glass-strong rounded-2xl px-4 py-3 flex items-center gap-4 transition-transform duration-300">
+    <span id="toastMsg" class="text-xs" style="color:var(--ink-dim)">Task deleted</span>
+    <button id="toastUndo" class="text-xs font-mono font-semibold underline underline-offset-2">Undo</button>
+  </div>
+
+  <!-- Add / Edit Task Modal -->
+  <div id="modalOverlay" class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
     <div id="modalCard" class="glass-strong rounded-3xl w-full max-w-sm p-6">
       <div class="flex items-center justify-between mb-5">
-        <h2 class="font-display text-lg font-semibold">New client task</h2>
+        <h2 id="modalTitle" class="font-display text-lg font-semibold">New client task</h2>
         <button id="modalClose" class="w-8 h-8 rounded-full flex items-center justify-center glass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       </div>
       <div class="space-y-4">
@@ -149,10 +168,19 @@
         <h2 class="font-display text-lg font-semibold">Settings</h2>
         <button id="settingsClose" class="w-8 h-8 rounded-full flex items-center justify-center glass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       </div>
-      <p class="text-xs leading-relaxed mb-4" style="color:var(--ink-dim)">Optional: paste your Google Sheets Apps Script Web App URL to sync new tasks and daily progress automatically. Leave blank to keep data on this device only.</p>
+      <p class="text-xs leading-relaxed mb-4" style="color:var(--ink-dim)">Optional: paste your Google Sheets Apps Script Web App URL to sync tasks and daily progress automatically. Leave blank to keep data on this device only.</p>
       <input id="inputSheetsUrl" type="text" placeholder="https://script.google.com/macros/s/..." class="w-full bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-xs font-mono placeholder:text-white/25">
-      <div class="flex gap-3 mt-6">
-        <button id="resetDayBtn" class="flex-1 glass rounded-2xl py-3 text-xs font-mono active:scale-95 transition-transform">Reset today's checklist</button>
+
+      <div class="glass rounded-2xl px-4 py-3 mt-4 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium" id="syncStatusText">All synced</p>
+          <p class="text-[10px] mt-0.5" style="color:var(--ink-dimmer)" id="syncStatusSub">No pending items</p>
+        </div>
+        <button id="retrySyncBtn" class="quick-log-btn">Retry now</button>
+      </div>
+
+      <div class="flex gap-3 mt-5">
+        <button id="resetDayBtn" class="flex-1 glass rounded-2xl py-3 text-xs font-mono active:scale-95 transition-transform">Reset today</button>
         <button id="saveSettingsBtn" class="flex-1 bg-[#f5f5f3] text-black font-display font-semibold rounded-2xl py-3 text-sm active:scale-95 transition-transform">Save</button>
       </div>
     </div>
@@ -170,31 +198,50 @@ async function setStore(key, value){
   try{ await window.storage.set(key, JSON.stringify(value), false); }
   catch(e){ console.error('storage set failed', e); }
 }
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+function minutesToLabel(m){
+  if(!m) return '0m';
+  const h = Math.floor(m/60), mm = m%60;
+  return (h ? h+'h ' : '') + (mm || !h ? mm+'m' : '');
+}
+function dateKeysBack(n){
+  const out = [];
+  for(let i=n-1;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    out.push(d.toISOString().slice(0,10));
+  }
+  return out;
+}
 
-/* ---------------- Schedule data ---------------- */
-const SCHEDULE = [
-  {id:'meditation', time:'4:00–5:00', title:'Meditation, study, plan the day', group:'Morning'},
-  {id:'yoga', time:'5:00–6:00', title:'Yoga / Exercise', group:'Morning'},
-  {id:'bath', time:'6:00–7:00', title:'Bath, get ready', group:'Morning'},
-  {id:'breakfast', time:'7:00–9:15', title:"Breakfast, family time, get daughter ready", group:'Morning'},
-  {id:'dropoff', time:'9:15–9:45', title:'School drop-off + back home', group:'Morning'},
-  {id:'creative', time:'9:45–10:15', title:'Creative & social post for Amortree', group:'Marketing & Outreach'},
-  {id:'outreach', time:'10:15–11:15', title:'Outreach — 10+ messages / emails', group:'Marketing & Outreach'},
-  {id:'clientwork1', time:'11:15–12:15', title:'Client work (if any)', group:'Marketing & Outreach'},
-  {id:'lunch', time:'12:15–1:00', title:'Lunch', group:'Break'},
-  {id:'dropship', time:'1:00–2:00', title:'Dropshipping setup / management', group:'Deep Work'},
-  {id:'corework', time:'2:00–5:00', title:'Core work — Microrelic / Amortree', group:'Deep Work'},
-  {id:'break2', time:'5:00–5:15', title:'Break / tea', group:'Learning'},
-  {id:'learning', time:'5:15–6:15', title:'Self-branding training / n8n automation', group:'Learning'},
-  {id:'family', time:'6:15–8:00', title:'Family time + dinner', group:'Evening'},
-  {id:'buffer', time:'8:00–9:00', title:'Buffer — catch-up / personal time', group:'Evening'},
-  {id:'planday', time:'9:00–9:30', title:"Plan tomorrow's top 3 tasks", group:'Evening'},
-  {id:'winddown', time:'9:30–11:00', title:'Wind down, sleep prep', group:'Evening'},
+/* ---------------- Schedule data (with real minute ranges) ---------------- */
+const RAW_SCHEDULE = [
+  ['meditation','4:00–5:00','Meditation, study, plan the day','Morning',4,0,5,0],
+  ['yoga','5:00–6:00','Yoga / Exercise','Morning',5,0,6,0],
+  ['bath','6:00–7:00','Bath, get ready','Morning',6,0,7,0],
+  ['breakfast','7:00–9:15','Breakfast, family time, get daughter ready','Morning',7,0,9,15],
+  ['dropoff','9:15–9:45','School drop-off + back home','Morning',9,15,9,45],
+  ['creative','9:45–10:15','Creative & social post for Amortree','Marketing & Outreach',9,45,10,15],
+  ['outreach','10:15–11:15','Outreach — 10+ messages / emails','Marketing & Outreach',10,15,11,15],
+  ['clientwork1','11:15–1:00','Client work (if any)','Marketing & Outreach',11,15,13,0],
+  ['lunch','1:00–2:00','Lunch','Break',13,0,14,0],
+  ['dropship','2:00–3:00','Dropshipping setup / management','Deep Work',14,0,15,0],
+  ['corework','3:00–6:00','Core work — Microrelic / Amortree','Deep Work',15,0,18,0],
+  ['break2','6:00–6:15','Break / tea','Learning',18,0,18,15],
+  ['learning','6:15–7:15','Self-branding training / n8n automation','Learning',18,15,19,15],
+  ['family','7:15–9:00','Family time + dinner','Evening',19,15,21,0],
+  ['planday','9:00–9:30',"Plan tomorrow's top 3 tasks",'Evening',21,0,21,30],
+  ['winddown','9:30–11:00','Wind down, sleep prep','Evening',21,30,23,0],
 ];
+const SCHEDULE = RAW_SCHEDULE.map(r=>({
+  id:r[0], time:r[1], title:r[2], group:r[3],
+  start: r[4]*60+r[5], end: r[6]*60+r[7]
+}));
 
-function todayKey(){
-  const d = new Date();
-  return d.toISOString().slice(0,10);
+function getCurrentBlockId(){
+  const now = new Date();
+  const mins = now.getHours()*60+now.getMinutes();
+  const block = SCHEDULE.find(b=> mins>=b.start && mins<b.end);
+  return block ? block.id : null;
 }
 
 /* ---------------- Liquid blob background ---------------- */
@@ -213,18 +260,64 @@ function initBlobs(){
       y: () => gsap.utils.random(-100,100),
       scale: () => gsap.utils.random(0.85,1.25),
       duration: () => gsap.utils.random(14,22),
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut',
-      delay: i*1.2
+      repeat: -1, yoyo: true, ease: 'sine.inOut', delay: i*1.2
     });
   });
+}
+
+/* ---------------- Sync queue (reliability layer) ---------------- */
+async function queueSync(sheet, row){
+  const queue = await getStore('sync-queue', []);
+  queue.push({qid: Date.now().toString(36)+Math.random().toString(36).slice(2,6), sheet, row, attempts:0});
+  await setStore('sync-queue', queue);
+  attemptSync();
+}
+async function attemptSync(){
+  const settings = await getStore('settings', {});
+  let queue = await getStore('sync-queue', []);
+  if(!settings.sheetsUrl){ updateSyncBadge(queue.length, true); return; }
+  if(queue.length === 0){ updateSyncBadge(0, false); return; }
+
+  const remaining = [];
+  for(const item of queue){
+    try{
+      await fetch(settings.sheetsUrl, {
+        method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({sheet:item.sheet, row:item.row})
+      });
+      // No thrown error = request left the browser successfully (best-effort confirmation;
+      // Apps Script's no-cors response can't be read, so this isn't a guarantee of server receipt).
+    }catch(e){
+      item.attempts++;
+      remaining.push(item);
+    }
+  }
+  await setStore('sync-queue', remaining);
+  updateSyncBadge(remaining.length, false);
+}
+function updateSyncBadge(count, noUrlConfigured){
+  const dot = document.getElementById('syncDot');
+  dot.classList.toggle('hidden', count === 0 || noUrlConfigured);
+  const statusText = document.getElementById('syncStatusText');
+  const statusSub = document.getElementById('syncStatusSub');
+  if(!statusText) return;
+  if(noUrlConfigured){
+    statusText.textContent = 'Not connected';
+    statusSub.textContent = 'Add a Sheets URL to enable sync';
+  }else if(count === 0){
+    statusText.textContent = 'All synced';
+    statusSub.textContent = 'No pending items';
+  }else{
+    statusText.textContent = count + ' item' + (count>1?'s':'') + ' pending';
+    statusSub.textContent = 'Will retry automatically, or tap Retry now';
+  }
 }
 
 /* ---------------- Rendering: Timetable ---------------- */
 async function renderTimetable(){
   const container = document.getElementById('view-timetable');
   const progress = await getStore('timetable:'+todayKey(), {});
+  const currentId = getCurrentBlockId();
   let groups = {};
   SCHEDULE.forEach(item=>{ (groups[item.group] = groups[item.group]||[]).push(item); });
 
@@ -233,18 +326,24 @@ async function renderTimetable(){
     html += `<p class="text-[11px] uppercase tracking-[0.18em] font-mono mt-6 mb-2.5 first:mt-0" style="color:var(--ink-dimmer)">${groupName}</p>`;
     groups[groupName].forEach(item=>{
       const done = !!progress[item.id];
+      const isNow = item.id === currentId;
       html += `
-      <div class="glass rounded-2xl px-4 py-3.5 mb-2.5 flex items-center gap-3.5 task-card" data-block="${item.id}">
+      <div class="glass rounded-2xl px-4 py-3.5 mb-2.5 flex items-center gap-3.5 task-card ${isNow?'now':''}" data-block="${item.id}" id="block-${item.id}">
         <button class="checkbox-toggle checkbox-ring ${done?'done':''}" data-block="${item.id}">
           ${done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : ''}
         </button>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium leading-snug ${done ? 'line-through' : ''}" style="${done?'color:var(--ink-dimmer)':''}">${item.title}</p>
+          <div class="flex items-center gap-2">
+            <p class="text-sm font-medium leading-snug ${done ? 'line-through' : ''}" style="${done?'color:var(--ink-dimmer)':''}">${item.title}</p>
+            ${isNow ? '<span class="now-badge shrink-0 flex items-center gap-1"><span class="pulse-dot"></span>NOW</span>' : ''}
+          </div>
           <p class="text-[11px] font-mono mt-0.5" style="color:var(--ink-dimmer)">${item.time}</p>
         </div>
       </div>`;
     });
   });
+
+  html += renderWeekHistory(await getWeekCompletionData());
   container.innerHTML = html;
 
   document.querySelectorAll('.checkbox-toggle').forEach(btn=>{
@@ -254,11 +353,53 @@ async function renderTimetable(){
       prog[blockId] = !prog[blockId];
       await setStore('timetable:'+todayKey(), prog);
       gsap.fromTo(btn, {scale:0.7}, {scale:1, duration:0.35, ease:'back.out(2)'});
-      syncToSheets('Timetable', {date: todayKey(), block: blockId, completed: prog[blockId]});
+      queueSync('Timetable', {date: todayKey(), block: blockId, completed: prog[blockId]});
       renderTimetable();
       updateProgressRing();
     });
   });
+}
+
+async function getWeekCompletionData(){
+  const keys = dateKeysBack(7);
+  const data = [];
+  for(const k of keys){
+    const prog = await getStore('timetable:'+k, {});
+    const done = SCHEDULE.filter(i=>prog[i.id]).length;
+    data.push({date:k, pct: Math.round((done/SCHEDULE.length)*100)});
+  }
+  return data;
+}
+
+function computeStreak(weekData){
+  let streak = 0;
+  for(let i = weekData.length-1; i>=0; i--){
+    if(weekData[i].pct >= 60) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function renderWeekHistory(weekData){
+  const streak = computeStreak(weekData);
+  const dayLetters = weekData.map(d => new Date(d.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'})[0]);
+  const bars = weekData.map((d,i)=>`
+    <div class="flex-1 flex flex-col items-center gap-1.5">
+      <div class="week-bar h-16 w-full flex items-end">
+        <div class="week-bar-fill" style="height:${Math.max(d.pct,3)}%"></div>
+      </div>
+      <span class="text-[9px] font-mono" style="color:var(--ink-dimmer)">${dayLetters[i]}</span>
+    </div>`).join('');
+
+  return `
+    <p class="text-[11px] uppercase tracking-[0.18em] font-mono mt-7 mb-2.5" style="color:var(--ink-dimmer)">This week</p>
+    <div class="glass rounded-2xl px-4 py-4">
+      <div class="flex justify-between items-center mb-3.5">
+        <p class="text-xs" style="color:var(--ink-dim)">Last 7 days</p>
+        <p class="font-mono text-xs font-medium">${streak > 0 ? streak+'-day streak' : 'No streak yet'}</p>
+      </div>
+      <div class="flex gap-2">${bars}</div>
+    </div>`;
 }
 
 async function updateProgressRing(){
@@ -268,12 +409,18 @@ async function updateProgressRing(){
   const pct = total ? Math.round((done/total)*100) : 0;
   const circumference = 2*Math.PI*17;
   const offset = circumference - (pct/100)*circumference;
-  const arc = document.getElementById('progressArc');
-  gsap.to(arc, {strokeDashoffset: offset, duration:0.6, ease:'power2.out'});
+  gsap.to('#progressArc', {strokeDashoffset: offset, duration:0.6, ease:'power2.out'});
   document.getElementById('progressPct').textContent = pct+'%';
 }
 
-/* ---------------- Rendering: Client Tasks ---------------- */
+/* ---------------- Client Tasks: cache-backed for undo support ---------------- */
+let tasksCache = null;
+async function loadTasksCache(){
+  if(tasksCache === null) tasksCache = await getStore('client-tasks', []);
+  return tasksCache;
+}
+async function persistTasksCache(){ await setStore('client-tasks', tasksCache); }
+
 function taskStatus(task){
   const today = todayKey();
   if(task.completed) return {label:'Completed', icon:'check'};
@@ -281,29 +428,45 @@ function taskStatus(task){
   if(today > task.endDate) return {label:'Overdue', icon:'alert'};
   return {label:'In progress', icon:'clock'};
 }
-
 const ICONS = {
   check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>',
   calendar: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   alert: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>',
-  clock: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'
+  clock: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+  edit: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  trash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6"/></svg>'
 };
+
+function taskTotalMinutes(task){
+  return (task.timeLog||[]).reduce((s,e)=>s+e.minutes,0);
+}
+function weekMinutesForTasks(tasks){
+  const keys = new Set(dateKeysBack(7));
+  let total = 0;
+  tasks.forEach(t=> (t.timeLog||[]).forEach(e=>{ if(keys.has(e.date)) total += e.minutes; }));
+  return total;
+}
 
 async function renderClientTasks(){
   const container = document.getElementById('view-clients');
-  const tasks = await getStore('client-tasks', []);
+  const tasks = await loadTasksCache();
   const sorted = [...tasks].sort((a,b)=> b.startDate.localeCompare(a.startDate));
-
   const active = tasks.filter(t=>!t.completed).length;
+  const weekMinutes = weekMinutesForTasks(tasks);
+
   let statsHtml = `
     <div class="flex gap-2.5 mb-5">
-      <div class="glass rounded-2xl px-4 py-3 flex-1">
-        <p class="font-mono text-xl font-semibold">${tasks.length}</p>
-        <p class="text-[10px] uppercase tracking-wider mt-0.5" style="color:var(--ink-dimmer)">Total tasks</p>
+      <div class="glass rounded-2xl px-3.5 py-3 flex-1">
+        <p class="font-mono text-lg font-semibold">${tasks.length}</p>
+        <p class="text-[9.5px] uppercase tracking-wider mt-0.5" style="color:var(--ink-dimmer)">Total</p>
       </div>
-      <div class="glass rounded-2xl px-4 py-3 flex-1">
-        <p class="font-mono text-xl font-semibold">${active}</p>
-        <p class="text-[10px] uppercase tracking-wider mt-0.5" style="color:var(--ink-dimmer)">Active</p>
+      <div class="glass rounded-2xl px-3.5 py-3 flex-1">
+        <p class="font-mono text-lg font-semibold">${active}</p>
+        <p class="text-[9.5px] uppercase tracking-wider mt-0.5" style="color:var(--ink-dimmer)">Active</p>
+      </div>
+      <div class="glass rounded-2xl px-3.5 py-3 flex-1">
+        <p class="font-mono text-lg font-semibold">${minutesToLabel(weekMinutes)}</p>
+        <p class="text-[9.5px] uppercase tracking-wider mt-0.5" style="color:var(--ink-dimmer)">This week</p>
       </div>
     </div>`;
 
@@ -319,6 +482,7 @@ async function renderClientTasks(){
   let listHtml = '';
   sorted.forEach(task=>{
     const status = taskStatus(task);
+    const totalMin = taskTotalMinutes(task);
     listHtml += `
     <div class="glass rounded-2xl px-4 py-3.5 mb-2.5" data-task="${task.id}">
       <div class="flex items-start justify-between gap-2">
@@ -327,18 +491,25 @@ async function renderClientTasks(){
           <p class="text-sm font-medium mt-0.5 leading-snug ${task.completed ? 'line-through' : ''}" style="${task.completed?'color:var(--ink-dimmer)':''}">${task.description}</p>
         </div>
         <div class="flex items-center gap-1 shrink-0">
-          <button class="toggle-done glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">
-            ${ICONS.check}
-          </button>
-          <button class="delete-task glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6"/></svg>
-          </button>
+          <button class="edit-task glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">${ICONS.edit}</button>
+          <button class="toggle-done glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">${ICONS.check}</button>
+          <button class="delete-task glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">${ICONS.trash}</button>
         </div>
       </div>
+
       <div class="flex items-center justify-between mt-3 pt-3" style="border-top:1px solid var(--glass-border)">
         <p class="font-mono text-[11px]" style="color:var(--ink-dimmer)">${task.startDate} → ${task.endDate}</p>
         <div class="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider" style="color:var(--ink-dim)">
           ${ICONS[status.icon]} ${status.label}
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mt-3 pt-3" style="border-top:1px solid var(--glass-border)">
+        <p class="font-mono text-[11px]" style="color:var(--ink-dim)">${minutesToLabel(totalMin)} logged</p>
+        <div class="flex gap-1.5">
+          <button class="log-time-btn quick-log-btn" data-id="${task.id}" data-min="15">+15m</button>
+          <button class="log-time-btn quick-log-btn" data-id="${task.id}" data-min="30">+30m</button>
+          <button class="log-time-btn quick-log-btn" data-id="${task.id}" data-min="60">+1h</button>
         </div>
       </div>
     </div>`;
@@ -348,34 +519,123 @@ async function renderClientTasks(){
 
   container.querySelectorAll('.toggle-done').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const tasks = await getStore('client-tasks', []);
+      const tasks = await loadTasksCache();
       const t = tasks.find(x=>x.id===btn.dataset.id);
-      if(t){ t.completed = !t.completed; await setStore('client-tasks', tasks); }
+      if(t){ t.completed = !t.completed; await persistTasksCache(); }
       renderClientTasks();
+    });
+  });
+  container.querySelectorAll('.log-time-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const tasks = await loadTasksCache();
+      const t = tasks.find(x=>x.id===btn.dataset.id);
+      if(!t) return;
+      t.timeLog = t.timeLog || [];
+      const entry = t.timeLog.find(e=>e.date===todayKey());
+      const min = parseInt(btn.dataset.min,10);
+      if(entry) entry.minutes += min; else t.timeLog.push({date: todayKey(), minutes: min});
+      await persistTasksCache();
+      queueSync('Client Tasks', {clientId:t.clientId, description:t.description, action:'time-log', minutesAdded:min, date:todayKey()});
+      gsap.fromTo(btn, {scale:0.85}, {scale:1, duration:0.3, ease:'back.out(2)'});
+      renderClientTasks();
+    });
+  });
+  container.querySelectorAll('.edit-task').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const tasks = await loadTasksCache();
+      const t = tasks.find(x=>x.id===btn.dataset.id);
+      if(t) openModal(t);
     });
   });
   container.querySelectorAll('.delete-task').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      let tasks = await getStore('client-tasks', []);
-      tasks = tasks.filter(x=>x.id!==btn.dataset.id);
-      await setStore('client-tasks', tasks);
-      renderClientTasks();
-    });
+    btn.addEventListener('click', async ()=>{ await deleteTaskWithUndo(btn.dataset.id); });
   });
 }
 
-/* ---------------- Google Sheets sync (optional) ---------------- */
-async function syncToSheets(sheetName, row){
-  const settings = await getStore('settings', {});
-  if(!settings.sheetsUrl) return;
-  try{
-    fetch(settings.sheetsUrl, {
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({sheet: sheetName, row})
-    });
-  }catch(e){ console.error('sheets sync failed', e); }
+/* ---------------- Delete with undo ---------------- */
+let pendingDelete = null;
+let toastTimeout = null;
+
+async function deleteTaskWithUndo(id){
+  const tasks = await loadTasksCache();
+  const idx = tasks.findIndex(t=>t.id===id);
+  if(idx === -1) return;
+  const [removed] = tasks.splice(idx,1);
+  await persistTasksCache();
+  pendingDelete = {task: removed, index: idx};
+  renderClientTasks();
+  showToast('Task deleted');
+}
+
+function showToast(msg){
+  document.getElementById('toastMsg').textContent = msg;
+  const toast = document.getElementById('toast');
+  gsap.to(toast, {y:0, duration:0.35, ease:'power3.out'});
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(hideToast, 5000);
+}
+function hideToast(){
+  const toast = document.getElementById('toast');
+  gsap.to(toast, {y:'120%', duration:0.3, ease:'power2.in', onComplete: ()=>{ pendingDelete = null; }});
+}
+
+/* ---------------- Modal (create + edit) ---------------- */
+let editingTaskId = null;
+
+function openModal(task){
+  editingTaskId = task ? task.id : null;
+  document.getElementById('modalTitle').textContent = task ? 'Edit client task' : 'New client task';
+  document.getElementById('saveTaskBtn').textContent = task ? 'Update task' : 'Save task';
+  document.getElementById('inputClientId').value = task ? task.clientId : '';
+  document.getElementById('inputDescription').value = task ? task.description : '';
+  document.getElementById('inputStart').value = task ? task.startDate : '';
+  document.getElementById('inputEnd').value = task ? task.endDate : '';
+
+  const overlay = document.getElementById('modalOverlay');
+  overlay.classList.remove('hidden'); overlay.classList.add('flex');
+  gsap.fromTo('#modalCard', {y:40, opacity:0, scale:0.96}, {y:0, opacity:1, scale:1, duration:0.35, ease:'power3.out'});
+}
+function closeModal(){
+  gsap.to('#modalCard', {y:20, opacity:0, scale:0.96, duration:0.2, onComplete:()=>{
+    document.getElementById('modalOverlay').classList.add('hidden');
+    document.getElementById('modalOverlay').classList.remove('flex');
+    document.getElementById('modalError').classList.add('hidden');
+    editingTaskId = null;
+  }});
+}
+
+async function saveTask(){
+  const clientId = document.getElementById('inputClientId').value.trim();
+  const description = document.getElementById('inputDescription').value.trim();
+  const startDate = document.getElementById('inputStart').value;
+  const endDate = document.getElementById('inputEnd').value;
+  const errEl = document.getElementById('modalError');
+
+  if(!clientId || !description || !startDate || !endDate){
+    errEl.textContent = 'Please fill in every field.'; errEl.classList.remove('hidden'); return;
+  }
+  if(endDate < startDate){
+    errEl.textContent = 'End date must be after start date.'; errEl.classList.remove('hidden'); return;
+  }
+
+  const tasks = await loadTasksCache();
+
+  if(editingTaskId){
+    const t = tasks.find(x=>x.id===editingTaskId);
+    if(t){ Object.assign(t, {clientId, description, startDate, endDate}); }
+    queueSync('Client Tasks', {clientId, description, startDate, endDate, action:'update'});
+  }else{
+    const task = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      clientId, description, startDate, endDate,
+      completed:false, timeLog:[], createdAt: new Date().toISOString()
+    };
+    tasks.push(task);
+    queueSync('Client Tasks', {clientId, description, startDate, endDate, action:'create'});
+  }
+  await persistTasksCache();
+  closeModal();
+  renderClientTasks();
 }
 
 /* ---------------- Tabs ---------------- */
@@ -406,60 +666,12 @@ function initTabs(){
   buttons[0].style.color = '#f5f5f3';
 }
 
-/* ---------------- Modal ---------------- */
-function openModal(){
-  const overlay = document.getElementById('modalOverlay');
-  overlay.classList.remove('hidden');
-  overlay.classList.add('flex');
-  gsap.fromTo('#modalCard', {y:40, opacity:0, scale:0.96}, {y:0, opacity:1, scale:1, duration:0.35, ease:'power3.out'});
-}
-function closeModal(){
-  gsap.to('#modalCard', {y:20, opacity:0, scale:0.96, duration:0.2, onComplete:()=>{
-    document.getElementById('modalOverlay').classList.add('hidden');
-    document.getElementById('modalOverlay').classList.remove('flex');
-    document.getElementById('inputClientId').value='';
-    document.getElementById('inputDescription').value='';
-    document.getElementById('inputStart').value='';
-    document.getElementById('inputEnd').value='';
-    document.getElementById('modalError').classList.add('hidden');
-  }});
-}
-
-async function saveTask(){
-  const clientId = document.getElementById('inputClientId').value.trim();
-  const description = document.getElementById('inputDescription').value.trim();
-  const startDate = document.getElementById('inputStart').value;
-  const endDate = document.getElementById('inputEnd').value;
-  const errEl = document.getElementById('modalError');
-
-  if(!clientId || !description || !startDate || !endDate){
-    errEl.textContent = 'Please fill in every field.';
-    errEl.classList.remove('hidden');
-    return;
-  }
-  if(endDate < startDate){
-    errEl.textContent = 'End date must be after start date.';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const task = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    clientId, description, startDate, endDate,
-    completed:false, createdAt: new Date().toISOString()
-  };
-  const tasks = await getStore('client-tasks', []);
-  tasks.push(task);
-  await setStore('client-tasks', tasks);
-  syncToSheets('Client Tasks', {clientId, description, startDate, endDate, status:'In progress'});
-  closeModal();
-  renderClientTasks();
-}
-
 /* ---------------- Settings ---------------- */
 async function openSettings(){
   const settings = await getStore('settings', {});
   document.getElementById('inputSheetsUrl').value = settings.sheetsUrl || '';
+  const queue = await getStore('sync-queue', []);
+  updateSyncBadge(queue.length, !settings.sheetsUrl);
   const overlay = document.getElementById('settingsOverlay');
   overlay.classList.remove('hidden'); overlay.classList.add('flex');
   gsap.fromTo(overlay.firstElementChild, {y:40, opacity:0}, {y:0, opacity:1, duration:0.3, ease:'power3.out'});
@@ -474,23 +686,48 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   initBlobs();
   initTabs();
 
-  const dateLabel = document.getElementById('dateLabel');
-  dateLabel.textContent = new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
+  document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
 
-  renderTimetable();
-  renderClientTasks();
+  await renderTimetable();
+  await renderClientTasks();
   updateProgressRing();
+  attemptSync();
 
-  document.getElementById('fabAdd').addEventListener('click', openModal);
+  // scroll current block into view on load
+  const currentId = getCurrentBlockId();
+  if(currentId){
+    const el = document.getElementById('block-'+currentId);
+    if(el) setTimeout(()=> el.scrollIntoView({behavior:'smooth', block:'center'}), 400);
+  }
+
+  // keep "now" indicator fresh
+  setInterval(renderTimetable, 60000);
+  // periodic background retry for sync queue
+  setInterval(attemptSync, 45000);
+
+  document.getElementById('fabAdd').addEventListener('click', ()=>openModal(null));
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('saveTaskBtn').addEventListener('click', saveTask);
 
+  document.getElementById('toastUndo').addEventListener('click', async ()=>{
+    if(!pendingDelete) return;
+    const tasks = await loadTasksCache();
+    tasks.splice(pendingDelete.index, 0, pendingDelete.task);
+    await persistTasksCache();
+    pendingDelete = null;
+    clearTimeout(toastTimeout);
+    hideToast();
+    renderClientTasks();
+  });
+
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
   document.getElementById('settingsClose').addEventListener('click', closeSettings);
+  document.getElementById('retrySyncBtn').addEventListener('click', async ()=>{ await attemptSync(); const q = await getStore('sync-queue', []); const s = await getStore('settings', {}); updateSyncBadge(q.length, !s.sheetsUrl); });
   document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
     const url = document.getElementById('inputSheetsUrl').value.trim();
     await setStore('settings', {sheetsUrl:url});
     closeSettings();
+    attemptSync();
   });
   document.getElementById('resetDayBtn').addEventListener('click', async ()=>{
     await setStore('timetable:'+todayKey(), {});
@@ -499,7 +736,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     closeSettings();
   });
 
-  // entrance animation
   gsap.fromTo('main > div:not(.hidden)', {opacity:0, y:12}, {opacity:1, y:0, duration:0.5, ease:'power2.out'});
   gsap.fromTo('header', {opacity:0, y:-8}, {opacity:1, y:0, duration:0.4});
 });
