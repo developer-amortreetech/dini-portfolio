@@ -77,8 +77,16 @@
   .week-bar{ width:100%; border-radius:6px 6px 3px 3px; background:rgba(255,255,255,0.1); position:relative; overflow:hidden; }
   .week-bar-fill{ position:absolute; bottom:0; left:0; right:0; background:#f5f5f3; border-radius:6px 6px 3px 3px; }
 
-  #toast{ transform: translateY(120%); }
   #syncDot{ box-shadow:0 0 0 2px var(--bg); }
+  .status-option{ transition: all .2s ease; border-color: var(--glass-border); color: var(--ink-dim); }
+  .status-option.active{ background:#f5f5f3; color:#050505; border-color:#f5f5f3; }
+  .status-pill{
+    display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:9999px;
+    font-family:'JetBrains Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+    border:1px solid var(--glass-border); color:var(--ink-dim);
+  }
+  .status-pill.is-done{ background:#f5f5f3; color:#050505; border-color:#f5f5f3; }
+  .status-pill.is-overdue{ border-color:rgba(255,255,255,0.45); color:var(--ink); }
 </style>
 </head>
 <body class="min-h-screen relative">
@@ -124,22 +132,27 @@
   </button>
 
   <!-- Toast (undo) -->
-  <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 glass-strong rounded-2xl px-4 py-3 flex items-center gap-4 transition-transform duration-300">
-    <span id="toastMsg" class="text-xs" style="color:var(--ink-dim)">Task deleted</span>
-    <button id="toastUndo" class="text-xs font-mono font-semibold underline underline-offset-2">Undo</button>
+  <div id="toastWrap" class="hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-40">
+    <div id="toast" class="glass-strong rounded-2xl px-4 py-3 flex items-center gap-4">
+      <span id="toastMsg" class="text-xs" style="color:var(--ink-dim)">Task deleted</span>
+      <button id="toastUndo" class="text-xs font-mono font-semibold underline underline-offset-2">Undo</button>
+    </div>
   </div>
 
   <!-- Add / Edit Task Modal -->
   <div id="modalOverlay" class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
     <div id="modalCard" class="glass-strong rounded-3xl w-full max-w-sm p-6">
       <div class="flex items-center justify-between mb-5">
-        <h2 id="modalTitle" class="font-display text-lg font-semibold">New client task</h2>
-        <button id="modalClose" class="w-8 h-8 rounded-full flex items-center justify-center glass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <div>
+          <h2 id="modalTitle" class="font-display text-lg font-semibold">New client task</h2>
+          <p class="text-xs mt-0.5" style="color:var(--ink-dimmer)">Log the work, set the dates, track it through to done.</p>
+        </div>
+        <button id="modalClose" class="w-8 h-8 rounded-full flex items-center justify-center glass shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       </div>
       <div class="space-y-4">
         <div>
           <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">Client ID</label>
-          <input id="inputClientId" type="text" placeholder="e.g. CL-014" class="w-full mt-1.5 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 font-mono text-sm placeholder:text-white/25">
+          <input id="inputClientId" type="text" placeholder="e.g. CL-014 or client name" class="w-full mt-1.5 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 font-mono text-sm placeholder:text-white/25">
         </div>
         <div>
           <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">Task description</label>
@@ -153,6 +166,14 @@
           <div class="flex-1">
             <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">End date</label>
             <input id="inputEnd" type="date" class="w-full mt-1.5 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">Status</label>
+          <div class="flex gap-2 mt-1.5">
+            <button type="button" data-status="not-started" class="status-option flex-1 py-2.5 rounded-xl text-[11px] font-mono border">Not started</button>
+            <button type="button" data-status="in-progress" class="status-option flex-1 py-2.5 rounded-xl text-[11px] font-mono border">In progress</button>
+            <button type="button" data-status="done" class="status-option flex-1 py-2.5 rounded-xl text-[11px] font-mono border">Completed</button>
           </div>
         </div>
       </div>
@@ -421,12 +442,31 @@ async function loadTasksCache(){
 }
 async function persistTasksCache(){ await setStore('client-tasks', tasksCache); }
 
-function taskStatus(task){
+const STATUS_ORDER = ['not-started','in-progress','done'];
+const STATUS_META = {
+  'not-started': {label:'Not started', icon:'calendar', css:''},
+  'in-progress': {label:'In progress', icon:'clock', css:''},
+  'done': {label:'Completed', icon:'check', css:'is-done'}
+};
+function normalizedStatus(task){
+  if(task.status && STATUS_META[task.status]) return task.status;
+  // migrate legacy tasks that only had a boolean 'completed' flag
+  if(task.completed) return 'done';
   const today = todayKey();
-  if(task.completed) return {label:'Completed', icon:'check'};
-  if(today < task.startDate) return {label:'Upcoming', icon:'calendar'};
-  if(today > task.endDate) return {label:'Overdue', icon:'alert'};
-  return {label:'In progress', icon:'clock'};
+  return (today >= task.startDate && today <= task.endDate) ? 'in-progress' : 'not-started';
+}
+function taskStatus(task){
+  const status = normalizedStatus(task);
+  const today = todayKey();
+  if(status !== 'done' && today > task.endDate){
+    return {label:'Overdue', icon:'alert', css:'is-overdue', status};
+  }
+  return {...STATUS_META[status], status};
+}
+function defaultStatusForDates(startDate, endDate){
+  const today = todayKey();
+  if(!startDate || !endDate) return 'not-started';
+  return (today >= startDate && today <= endDate) ? 'in-progress' : 'not-started';
 }
 const ICONS = {
   check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -451,7 +491,7 @@ async function renderClientTasks(){
   const container = document.getElementById('view-clients');
   const tasks = await loadTasksCache();
   const sorted = [...tasks].sort((a,b)=> b.startDate.localeCompare(a.startDate));
-  const active = tasks.filter(t=>!t.completed).length;
+  const active = tasks.filter(t=>normalizedStatus(t) !== 'done').length;
   const weekMinutes = weekMinutesForTasks(tasks);
 
   let statsHtml = `
@@ -488,20 +528,19 @@ async function renderClientTasks(){
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <p class="font-mono text-[11px]" style="color:var(--ink-dimmer)">${task.clientId}</p>
-          <p class="text-sm font-medium mt-0.5 leading-snug ${task.completed ? 'line-through' : ''}" style="${task.completed?'color:var(--ink-dimmer)':''}">${task.description}</p>
+          <p class="text-sm font-medium mt-0.5 leading-snug ${status.status==='done' ? 'line-through' : ''}" style="${status.status==='done'?'color:var(--ink-dimmer)':''}">${task.description}</p>
         </div>
         <div class="flex items-center gap-1 shrink-0">
           <button class="edit-task glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">${ICONS.edit}</button>
-          <button class="toggle-done glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">${ICONS.check}</button>
           <button class="delete-task glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">${ICONS.trash}</button>
         </div>
       </div>
 
       <div class="flex items-center justify-between mt-3 pt-3" style="border-top:1px solid var(--glass-border)">
         <p class="font-mono text-[11px]" style="color:var(--ink-dimmer)">${task.startDate} → ${task.endDate}</p>
-        <div class="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider" style="color:var(--ink-dim)">
+        <button class="status-pill cycle-status ${status.css}" data-id="${task.id}">
           ${ICONS[status.icon]} ${status.label}
-        </div>
+        </button>
       </div>
 
       <div class="flex items-center justify-between mt-3 pt-3" style="border-top:1px solid var(--glass-border)">
@@ -517,11 +556,18 @@ async function renderClientTasks(){
 
   container.innerHTML = statsHtml + listHtml;
 
-  container.querySelectorAll('.toggle-done').forEach(btn=>{
+  container.querySelectorAll('.cycle-status').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const tasks = await loadTasksCache();
       const t = tasks.find(x=>x.id===btn.dataset.id);
-      if(t){ t.completed = !t.completed; await persistTasksCache(); }
+      if(!t) return;
+      const cur = normalizedStatus(t);
+      const next = STATUS_ORDER[(STATUS_ORDER.indexOf(cur)+1) % STATUS_ORDER.length];
+      t.status = next;
+      t.completed = next === 'done';
+      await persistTasksCache();
+      queueSync('Client Tasks', {clientId:t.clientId, description:t.description, action:'status-change', status:next});
+      gsap.fromTo(btn, {scale:0.9}, {scale:1, duration:0.3, ease:'back.out(2)'});
       renderClientTasks();
     });
   });
@@ -569,18 +615,32 @@ async function deleteTaskWithUndo(id){
 
 function showToast(msg){
   document.getElementById('toastMsg').textContent = msg;
+  const wrap = document.getElementById('toastWrap');
   const toast = document.getElementById('toast');
-  gsap.to(toast, {y:0, duration:0.35, ease:'power3.out'});
+  wrap.classList.remove('hidden');
+  gsap.fromTo(toast, {y:30, opacity:0}, {y:0, opacity:1, duration:0.35, ease:'power3.out'});
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(hideToast, 5000);
 }
 function hideToast(){
+  const wrap = document.getElementById('toastWrap');
   const toast = document.getElementById('toast');
-  gsap.to(toast, {y:'120%', duration:0.3, ease:'power2.in', onComplete: ()=>{ pendingDelete = null; }});
+  gsap.to(toast, {y:20, opacity:0, duration:0.25, ease:'power2.in', onComplete: ()=>{
+    wrap.classList.add('hidden');
+    pendingDelete = null;
+  }});
 }
 
 /* ---------------- Modal (create + edit) ---------------- */
 let editingTaskId = null;
+
+let selectedStatus = 'not-started';
+function setStatusUI(status){
+  selectedStatus = status;
+  document.querySelectorAll('.status-option').forEach(b=>{
+    b.classList.toggle('active', b.dataset.status === status);
+  });
+}
 
 function openModal(task){
   editingTaskId = task ? task.id : null;
@@ -590,6 +650,7 @@ function openModal(task){
   document.getElementById('inputDescription').value = task ? task.description : '';
   document.getElementById('inputStart').value = task ? task.startDate : '';
   document.getElementById('inputEnd').value = task ? task.endDate : '';
+  setStatusUI(task ? normalizedStatus(task) : 'not-started');
 
   const overlay = document.getElementById('modalOverlay');
   overlay.classList.remove('hidden'); overlay.classList.add('flex');
@@ -622,16 +683,17 @@ async function saveTask(){
 
   if(editingTaskId){
     const t = tasks.find(x=>x.id===editingTaskId);
-    if(t){ Object.assign(t, {clientId, description, startDate, endDate}); }
-    queueSync('Client Tasks', {clientId, description, startDate, endDate, action:'update'});
+    if(t){ Object.assign(t, {clientId, description, startDate, endDate, status: selectedStatus, completed: selectedStatus==='done'}); }
+    queueSync('Client Tasks', {clientId, description, startDate, endDate, status:selectedStatus, action:'update'});
   }else{
     const task = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
       clientId, description, startDate, endDate,
-      completed:false, timeLog:[], createdAt: new Date().toISOString()
+      status: selectedStatus, completed: selectedStatus==='done',
+      timeLog:[], createdAt: new Date().toISOString()
     };
     tasks.push(task);
-    queueSync('Client Tasks', {clientId, description, startDate, endDate, action:'create'});
+    queueSync('Client Tasks', {clientId, description, startDate, endDate, status:selectedStatus, action:'create'});
   }
   await persistTasksCache();
   closeModal();
@@ -708,6 +770,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('fabAdd').addEventListener('click', ()=>openModal(null));
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('saveTaskBtn').addEventListener('click', saveTask);
+  document.querySelectorAll('.status-option').forEach(btn=>{
+    btn.addEventListener('click', ()=> setStatusUI(btn.dataset.status));
+  });
 
   document.getElementById('toastUndo').addEventListener('click', async ()=>{
     if(!pendingDelete) return;
