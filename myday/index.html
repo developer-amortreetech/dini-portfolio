@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Dini — Daily Hub</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #050505;
+    --glass-bg: rgba(255,255,255,0.055);
+    --glass-bg-strong: rgba(255,255,255,0.09);
+    --glass-border: rgba(255,255,255,0.12);
+    --ink: #f5f5f3;
+    --ink-dim: rgba(245,245,243,0.55);
+    --ink-dimmer: rgba(245,245,243,0.32);
+  }
+  *{-webkit-tap-highlight-color: transparent;}
+  html,body{background:var(--bg); color:var(--ink); overscroll-behavior:none;}
+  body{font-family:'Inter',sans-serif;}
+  .font-display{font-family:'Space Grotesk',sans-serif;}
+  .font-mono{font-family:'JetBrains Mono',monospace;}
+
+  .blob-field{position:fixed; inset:0; overflow:hidden; z-index:0; pointer-events:none;}
+  .blob{position:absolute; border-radius:9999px; filter:blur(60px); background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.14), rgba(255,255,255,0) 70%);}
+
+  .glass{
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(20px) saturate(120%);
+  }
+  .glass-strong{
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(24px) saturate(130%);
+    -webkit-backdrop-filter: blur(24px) saturate(130%);
+  }
+  ::-webkit-scrollbar{width:0px; height:0px;}
+  .no-scrollbar{scrollbar-width:none;}
+
+  input[type="date"]::-webkit-calendar-picker-indicator{
+    filter: invert(1); opacity:0.6; cursor:pointer;
+  }
+  .tab-underline{ transition: transform .35s cubic-bezier(.65,0,.35,1); }
+
+  .checkbox-ring{
+    width:22px; height:22px; border-radius:9999px;
+    border:1.5px solid rgba(245,245,243,0.35);
+    display:flex; align-items:center; justify-content:center;
+    transition: all .25s ease;
+    flex-shrink:0;
+  }
+  .checkbox-ring.done{ background:var(--ink); border-color:var(--ink); }
+  .checkbox-ring.done svg{ stroke:#050505; }
+
+  .status-dot{ width:6px; height:6px; border-radius:9999px; }
+
+  @media (max-width: 480px){
+    .safe-bottom{ padding-bottom: env(safe-area-inset-bottom, 0px); }
+  }
+</style>
+</head>
+<body class="min-h-screen relative">
+
+  <div class="blob-field" id="blobField"></div>
+
+  <!-- App shell -->
+  <div class="relative z-10 max-w-md mx-auto min-h-screen flex flex-col px-4 pt-6">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-5">
+      <div>
+        <p class="text-[11px] tracking-[0.2em] uppercase font-mono text-ink-dim" style="color:var(--ink-dimmer)" id="dateLabel">—</p>
+        <h1 class="font-display text-2xl font-semibold tracking-tight">Dini</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="glass rounded-full w-11 h-11 flex items-center justify-center relative" id="progressRing">
+          <svg width="40" height="40" viewBox="0 0 40 40" class="absolute">
+            <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
+            <circle id="progressArc" cx="20" cy="20" r="17" fill="none" stroke="#f5f5f3" stroke-width="3" stroke-linecap="round" stroke-dasharray="106.8" stroke-dashoffset="106.8" transform="rotate(-90 20 20)"/>
+          </svg>
+          <span id="progressPct" class="font-mono text-[10px] relative">0%</span>
+        </div>
+        <button id="settingsBtn" class="glass rounded-full w-11 h-11 flex items-center justify-center active:scale-90 transition-transform">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="glass rounded-2xl p-1 flex relative mb-5">
+      <div id="tabIndicator" class="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl glass-strong tab-underline"></div>
+      <button data-tab="timetable" class="tab-btn flex-1 py-2.5 text-sm font-medium relative z-10 font-display">Timetable</button>
+      <button data-tab="clients" class="tab-btn flex-1 py-2.5 text-sm font-medium relative z-10 font-display" style="color:var(--ink-dim)">Client Tasks</button>
+    </div>
+
+    <!-- Views -->
+    <main class="flex-1 pb-32">
+      <div id="view-timetable"></div>
+      <div id="view-clients" class="hidden"></div>
+    </main>
+  </div>
+
+  <!-- Floating Add Button (Client Tasks only) -->
+  <button id="fabAdd" class="hidden fixed bottom-8 right-1/2 translate-x-[calc(50%+120px)] z-20 glass-strong rounded-full w-16 h-16 items-center justify-center shadow-2xl active:scale-90 transition-transform">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+  <!-- Add Task Modal -->
+  <div id="modalOverlay" class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-4">
+    <div id="modalCard" class="glass-strong rounded-3xl w-full max-w-sm p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="font-display text-lg font-semibold">New client task</h2>
+        <button id="modalClose" class="w-8 h-8 rounded-full flex items-center justify-center glass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">Client ID</label>
+          <input id="inputClientId" type="text" placeholder="e.g. CL-014" class="w-full mt-1.5 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 font-mono text-sm placeholder:text-white/25">
+        </div>
+        <div>
+          <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">Task description</label>
+          <textarea id="inputDescription" rows="2" placeholder="What needs doing?" class="w-full mt-1.5 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm resize-none placeholder:text-white/25"></textarea>
+        </div>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">Start date</label>
+            <input id="inputStart" type="date" class="w-full mt-1.5 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm font-mono">
+          </div>
+          <div class="flex-1">
+            <label class="text-[11px] uppercase tracking-wider font-mono" style="color:var(--ink-dimmer)">End date</label>
+            <input id="inputEnd" type="date" class="w-full mt-1.5 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm font-mono">
+          </div>
+        </div>
+      </div>
+      <button id="saveTaskBtn" class="w-full mt-6 bg-[#f5f5f3] text-black font-display font-semibold rounded-2xl py-3.5 text-sm active:scale-[0.98] transition-transform">Save task</button>
+      <p id="modalError" class="hidden text-[11px] text-white/50 mt-2 text-center"></p>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div id="settingsOverlay" class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
+    <div class="glass-strong rounded-3xl w-full max-w-sm p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-display text-lg font-semibold">Settings</h2>
+        <button id="settingsClose" class="w-8 h-8 rounded-full flex items-center justify-center glass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <p class="text-xs leading-relaxed mb-4" style="color:var(--ink-dim)">Optional: paste your Google Sheets Apps Script Web App URL to sync new tasks and daily progress automatically. Leave blank to keep data on this device only.</p>
+      <input id="inputSheetsUrl" type="text" placeholder="https://script.google.com/macros/s/..." class="w-full bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-xs font-mono placeholder:text-white/25">
+      <div class="flex gap-3 mt-6">
+        <button id="resetDayBtn" class="flex-1 glass rounded-2xl py-3 text-xs font-mono active:scale-95 transition-transform">Reset today's checklist</button>
+        <button id="saveSettingsBtn" class="flex-1 bg-[#f5f5f3] text-black font-display font-semibold rounded-2xl py-3 text-sm active:scale-95 transition-transform">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------------- Storage helpers ---------------- */
+async function getStore(key, fallback){
+  try{
+    const res = await window.storage.get(key, false);
+    return res ? JSON.parse(res.value) : fallback;
+  }catch(e){ return fallback; }
+}
+async function setStore(key, value){
+  try{ await window.storage.set(key, JSON.stringify(value), false); }
+  catch(e){ console.error('storage set failed', e); }
+}
+
+/* ---------------- Schedule data ---------------- */
+const SCHEDULE = [
+  {id:'meditation', time:'4:00–5:00', title:'Meditation, study, plan the day', group:'Morning'},
+  {id:'yoga', time:'5:00–6:00', title:'Yoga / Exercise', group:'Morning'},
+  {id:'bath', time:'6:00–7:00', title:'Bath, get ready', group:'Morning'},
+  {id:'breakfast', time:'7:00–9:15', title:"Breakfast, family time, get daughter ready", group:'Morning'},
+  {id:'dropoff', time:'9:15–9:45', title:'School drop-off + back home', group:'Morning'},
+  {id:'creative', time:'9:45–10:15', title:'Creative & social post for Amortree', group:'Marketing & Outreach'},
+  {id:'outreach', time:'10:15–11:15', title:'Outreach — 10+ messages / emails', group:'Marketing & Outreach'},
+  {id:'clientwork1', time:'11:15–12:15', title:'Client work (if any)', group:'Marketing & Outreach'},
+  {id:'lunch', time:'12:15–1:00', title:'Lunch', group:'Break'},
+  {id:'dropship', time:'1:00–2:00', title:'Dropshipping setup / management', group:'Deep Work'},
+  {id:'corework', time:'2:00–5:00', title:'Core work — Microrelic / Amortree', group:'Deep Work'},
+  {id:'break2', time:'5:00–5:15', title:'Break / tea', group:'Learning'},
+  {id:'learning', time:'5:15–6:15', title:'Self-branding training / n8n automation', group:'Learning'},
+  {id:'family', time:'6:15–8:00', title:'Family time + dinner', group:'Evening'},
+  {id:'buffer', time:'8:00–9:00', title:'Buffer — catch-up / personal time', group:'Evening'},
+  {id:'planday', time:'9:00–9:30', title:"Plan tomorrow's top 3 tasks", group:'Evening'},
+  {id:'winddown', time:'9:30–11:00', title:'Wind down, sleep prep', group:'Evening'},
+];
+
+function todayKey(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+/* ---------------- Liquid blob background ---------------- */
+function initBlobs(){
+  const field = document.getElementById('blobField');
+  const sizes = [420, 340, 380, 260];
+  sizes.forEach((s,i)=>{
+    const b = document.createElement('div');
+    b.className = 'blob';
+    b.style.width = s+'px'; b.style.height = s+'px';
+    b.style.left = (Math.random()*80)+'%';
+    b.style.top = (Math.random()*80)+'%';
+    field.appendChild(b);
+    gsap.to(b, {
+      x: () => gsap.utils.random(-120,120),
+      y: () => gsap.utils.random(-100,100),
+      scale: () => gsap.utils.random(0.85,1.25),
+      duration: () => gsap.utils.random(14,22),
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut',
+      delay: i*1.2
+    });
+  });
+}
+
+/* ---------------- Rendering: Timetable ---------------- */
+async function renderTimetable(){
+  const container = document.getElementById('view-timetable');
+  const progress = await getStore('timetable:'+todayKey(), {});
+  let groups = {};
+  SCHEDULE.forEach(item=>{ (groups[item.group] = groups[item.group]||[]).push(item); });
+
+  let html = '';
+  Object.keys(groups).forEach(groupName=>{
+    html += `<p class="text-[11px] uppercase tracking-[0.18em] font-mono mt-6 mb-2.5 first:mt-0" style="color:var(--ink-dimmer)">${groupName}</p>`;
+    groups[groupName].forEach(item=>{
+      const done = !!progress[item.id];
+      html += `
+      <div class="glass rounded-2xl px-4 py-3.5 mb-2.5 flex items-center gap-3.5 task-card" data-block="${item.id}">
+        <button class="checkbox-toggle checkbox-ring ${done?'done':''}" data-block="${item.id}">
+          ${done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : ''}
+        </button>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium leading-snug ${done ? 'line-through' : ''}" style="${done?'color:var(--ink-dimmer)':''}">${item.title}</p>
+          <p class="text-[11px] font-mono mt-0.5" style="color:var(--ink-dimmer)">${item.time}</p>
+        </div>
+      </div>`;
+    });
+  });
+  container.innerHTML = html;
+
+  document.querySelectorAll('.checkbox-toggle').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const blockId = btn.dataset.block;
+      const prog = await getStore('timetable:'+todayKey(), {});
+      prog[blockId] = !prog[blockId];
+      await setStore('timetable:'+todayKey(), prog);
+      gsap.fromTo(btn, {scale:0.7}, {scale:1, duration:0.35, ease:'back.out(2)'});
+      syncToSheets('Timetable', {date: todayKey(), block: blockId, completed: prog[blockId]});
+      renderTimetable();
+      updateProgressRing();
+    });
+  });
+}
+
+async function updateProgressRing(){
+  const progress = await getStore('timetable:'+todayKey(), {});
+  const total = SCHEDULE.length;
+  const done = SCHEDULE.filter(i=>progress[i.id]).length;
+  const pct = total ? Math.round((done/total)*100) : 0;
+  const circumference = 2*Math.PI*17;
+  const offset = circumference - (pct/100)*circumference;
+  const arc = document.getElementById('progressArc');
+  gsap.to(arc, {strokeDashoffset: offset, duration:0.6, ease:'power2.out'});
+  document.getElementById('progressPct').textContent = pct+'%';
+}
+
+/* ---------------- Rendering: Client Tasks ---------------- */
+function taskStatus(task){
+  const today = todayKey();
+  if(task.completed) return {label:'Completed', icon:'check'};
+  if(today < task.startDate) return {label:'Upcoming', icon:'calendar'};
+  if(today > task.endDate) return {label:'Overdue', icon:'alert'};
+  return {label:'In progress', icon:'clock'};
+}
+
+const ICONS = {
+  check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  calendar: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  alert: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>',
+  clock: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'
+};
+
+async function renderClientTasks(){
+  const container = document.getElementById('view-clients');
+  const tasks = await getStore('client-tasks', []);
+  const sorted = [...tasks].sort((a,b)=> b.startDate.localeCompare(a.startDate));
+
+  const active = tasks.filter(t=>!t.completed).length;
+  let statsHtml = `
+    <div class="flex gap-2.5 mb-5">
+      <div class="glass rounded-2xl px-4 py-3 flex-1">
+        <p class="font-mono text-xl font-semibold">${tasks.length}</p>
+        <p class="text-[10px] uppercase tracking-wider mt-0.5" style="color:var(--ink-dimmer)">Total tasks</p>
+      </div>
+      <div class="glass rounded-2xl px-4 py-3 flex-1">
+        <p class="font-mono text-xl font-semibold">${active}</p>
+        <p class="text-[10px] uppercase tracking-wider mt-0.5" style="color:var(--ink-dimmer)">Active</p>
+      </div>
+    </div>`;
+
+  if(sorted.length === 0){
+    statsHtml += `<div class="glass rounded-2xl px-5 py-10 text-center">
+      <p class="text-sm" style="color:var(--ink-dim)">No client tasks yet.</p>
+      <p class="text-xs mt-1" style="color:var(--ink-dimmer)">Tap the + button to log your first one.</p>
+    </div>`;
+    container.innerHTML = statsHtml;
+    return;
+  }
+
+  let listHtml = '';
+  sorted.forEach(task=>{
+    const status = taskStatus(task);
+    listHtml += `
+    <div class="glass rounded-2xl px-4 py-3.5 mb-2.5" data-task="${task.id}">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <p class="font-mono text-[11px]" style="color:var(--ink-dimmer)">${task.clientId}</p>
+          <p class="text-sm font-medium mt-0.5 leading-snug ${task.completed ? 'line-through' : ''}" style="${task.completed?'color:var(--ink-dimmer)':''}">${task.description}</p>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button class="toggle-done glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">
+            ${ICONS.check}
+          </button>
+          <button class="delete-task glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform" data-id="${task.id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between mt-3 pt-3" style="border-top:1px solid var(--glass-border)">
+        <p class="font-mono text-[11px]" style="color:var(--ink-dimmer)">${task.startDate} → ${task.endDate}</p>
+        <div class="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider" style="color:var(--ink-dim)">
+          ${ICONS[status.icon]} ${status.label}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = statsHtml + listHtml;
+
+  container.querySelectorAll('.toggle-done').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const tasks = await getStore('client-tasks', []);
+      const t = tasks.find(x=>x.id===btn.dataset.id);
+      if(t){ t.completed = !t.completed; await setStore('client-tasks', tasks); }
+      renderClientTasks();
+    });
+  });
+  container.querySelectorAll('.delete-task').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      let tasks = await getStore('client-tasks', []);
+      tasks = tasks.filter(x=>x.id!==btn.dataset.id);
+      await setStore('client-tasks', tasks);
+      renderClientTasks();
+    });
+  });
+}
+
+/* ---------------- Google Sheets sync (optional) ---------------- */
+async function syncToSheets(sheetName, row){
+  const settings = await getStore('settings', {});
+  if(!settings.sheetsUrl) return;
+  try{
+    fetch(settings.sheetsUrl, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({sheet: sheetName, row})
+    });
+  }catch(e){ console.error('sheets sync failed', e); }
+}
+
+/* ---------------- Tabs ---------------- */
+function initTabs(){
+  const buttons = document.querySelectorAll('.tab-btn');
+  const indicator = document.getElementById('tabIndicator');
+  const fab = document.getElementById('fabAdd');
+  buttons.forEach((btn, idx)=>{
+    btn.addEventListener('click', ()=>{
+      buttons.forEach(b=>b.style.color = 'var(--ink-dim)');
+      btn.style.color = '#f5f5f3';
+      gsap.to(indicator, {xPercent: idx*100, duration:0.4, ease:'power3.out'});
+
+      const timetableView = document.getElementById('view-timetable');
+      const clientsView = document.getElementById('view-clients');
+      const showTimetable = btn.dataset.tab === 'timetable';
+
+      gsap.to(showTimetable ? clientsView : timetableView, {opacity:0, y:8, duration:0.15, onComplete: ()=>{
+        timetableView.classList.toggle('hidden', !showTimetable);
+        clientsView.classList.toggle('hidden', showTimetable);
+        fab.classList.toggle('hidden', showTimetable);
+        fab.classList.toggle('flex', !showTimetable);
+        const target = showTimetable ? timetableView : clientsView;
+        gsap.fromTo(target, {opacity:0, y:8}, {opacity:1, y:0, duration:0.25});
+      }});
+    });
+  });
+  buttons[0].style.color = '#f5f5f3';
+}
+
+/* ---------------- Modal ---------------- */
+function openModal(){
+  const overlay = document.getElementById('modalOverlay');
+  overlay.classList.remove('hidden');
+  overlay.classList.add('flex');
+  gsap.fromTo('#modalCard', {y:40, opacity:0, scale:0.96}, {y:0, opacity:1, scale:1, duration:0.35, ease:'power3.out'});
+}
+function closeModal(){
+  gsap.to('#modalCard', {y:20, opacity:0, scale:0.96, duration:0.2, onComplete:()=>{
+    document.getElementById('modalOverlay').classList.add('hidden');
+    document.getElementById('modalOverlay').classList.remove('flex');
+    document.getElementById('inputClientId').value='';
+    document.getElementById('inputDescription').value='';
+    document.getElementById('inputStart').value='';
+    document.getElementById('inputEnd').value='';
+    document.getElementById('modalError').classList.add('hidden');
+  }});
+}
+
+async function saveTask(){
+  const clientId = document.getElementById('inputClientId').value.trim();
+  const description = document.getElementById('inputDescription').value.trim();
+  const startDate = document.getElementById('inputStart').value;
+  const endDate = document.getElementById('inputEnd').value;
+  const errEl = document.getElementById('modalError');
+
+  if(!clientId || !description || !startDate || !endDate){
+    errEl.textContent = 'Please fill in every field.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if(endDate < startDate){
+    errEl.textContent = 'End date must be after start date.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const task = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    clientId, description, startDate, endDate,
+    completed:false, createdAt: new Date().toISOString()
+  };
+  const tasks = await getStore('client-tasks', []);
+  tasks.push(task);
+  await setStore('client-tasks', tasks);
+  syncToSheets('Client Tasks', {clientId, description, startDate, endDate, status:'In progress'});
+  closeModal();
+  renderClientTasks();
+}
+
+/* ---------------- Settings ---------------- */
+async function openSettings(){
+  const settings = await getStore('settings', {});
+  document.getElementById('inputSheetsUrl').value = settings.sheetsUrl || '';
+  const overlay = document.getElementById('settingsOverlay');
+  overlay.classList.remove('hidden'); overlay.classList.add('flex');
+  gsap.fromTo(overlay.firstElementChild, {y:40, opacity:0}, {y:0, opacity:1, duration:0.3, ease:'power3.out'});
+}
+function closeSettings(){
+  document.getElementById('settingsOverlay').classList.add('hidden');
+  document.getElementById('settingsOverlay').classList.remove('flex');
+}
+
+/* ---------------- Init ---------------- */
+document.addEventListener('DOMContentLoaded', async ()=>{
+  initBlobs();
+  initTabs();
+
+  const dateLabel = document.getElementById('dateLabel');
+  dateLabel.textContent = new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long'});
+
+  renderTimetable();
+  renderClientTasks();
+  updateProgressRing();
+
+  document.getElementById('fabAdd').addEventListener('click', openModal);
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('saveTaskBtn').addEventListener('click', saveTask);
+
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('settingsClose').addEventListener('click', closeSettings);
+  document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
+    const url = document.getElementById('inputSheetsUrl').value.trim();
+    await setStore('settings', {sheetsUrl:url});
+    closeSettings();
+  });
+  document.getElementById('resetDayBtn').addEventListener('click', async ()=>{
+    await setStore('timetable:'+todayKey(), {});
+    renderTimetable();
+    updateProgressRing();
+    closeSettings();
+  });
+
+  // entrance animation
+  gsap.fromTo('main > div:not(.hidden)', {opacity:0, y:12}, {opacity:1, y:0, duration:0.5, ease:'power2.out'});
+  gsap.fromTo('header', {opacity:0, y:-8}, {opacity:1, y:0, duration:0.4});
+});
+</script>
+</body>
+</html>
