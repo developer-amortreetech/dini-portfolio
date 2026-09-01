@@ -37,10 +37,25 @@
             background: var(--bg);
             color: var(--ink);
             overscroll-behavior: none;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            overflow-x: hidden;
         }
 
         body {
             font-family: 'Inter', sans-serif;
+        }
+
+        /* Guaranteed centering for the app shell, independent of whether the
+           Tailwind CDN's runtime JIT has generated max-w-md/mx-auto yet — a
+           plain CSS rule always applies, so the layout can never render
+           un-centered while those utility classes are still being compiled. */
+        .app-shell {
+            width: 100%;
+            max-width: 28rem;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .font-display {
@@ -257,7 +272,7 @@
 
     <div class="blob-field" id="blobField"></div>
 
-    <div class="relative z-10 max-w-md mx-auto min-h-screen flex flex-col px-4 pt-6">
+    <div class="app-shell relative z-10 max-w-md mx-auto min-h-screen flex flex-col px-4 pt-6">
 
         <header class="flex items-center justify-between mb-5">
             <div>
