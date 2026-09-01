@@ -41,6 +41,9 @@
             padding: 0;
             width: 100%;
             overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            height: 100%;
         }
 
         body {
@@ -264,6 +267,95 @@
             border: 1px solid var(--glass-border);
             color: var(--ink-dim);
             text-transform: uppercase;
+        }
+
+        /* ---- Month report grid ---- */
+        .report-scroll {
+            overflow-x: auto;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 14px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+        }
+
+        .report-table th,
+        .report-table td {
+            border-bottom: 1px solid var(--glass-border);
+            border-right: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        .report-rowhead,
+        .report-rowhead-header {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #0b0b0b;
+            text-align: left;
+            padding: 7px 10px;
+            font-size: 10.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 138px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--ink-dim);
+            border-right: 1px solid var(--glass-border);
+        }
+
+        .report-rowhead-header {
+            z-index: 3;
+            color: var(--ink-dimmer);
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            font-size: 9px;
+        }
+
+        .report-daynum {
+            width: 28px;
+            min-width: 28px;
+            padding: 7px 2px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9.5px;
+            color: var(--ink-dimmer);
+            background: #0b0b0b;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .report-daynum.is-today {
+            color: #f5f5f3;
+            font-weight: 600;
+        }
+
+        .report-rowhead-header {
+            position: sticky;
+            top: 0;
+        }
+
+        .report-cell {
+            width: 28px;
+            min-width: 28px;
+            height: 28px;
+        }
+
+        .report-check {
+            color: #f5f5f3;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .report-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8.5px;
+            color: var(--ink-dim);
         }
     </style>
 </head>
@@ -526,17 +618,83 @@
         </div>
     </div>
 
+    <!-- Month Report Modal -->
+    <div id="monthReportOverlay"
+        class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
+        <div class="glass-strong rounded-3xl w-100 p-6 flex flex-col" style="max-height:85vh">
+            <div class="flex items-center justify-between mb-1 shrink-0">
+                <h2 class="font-display text-lg font-semibold">Month report</h2>
+                <button id="monthReportClose"
+                    class="w-8 h-8 rounded-full flex items-center justify-center glass shrink-0"><svg width="14"
+                        height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg></button>
+            </div>
+            <div class="flex items-center justify-between mt-3 mb-4 shrink-0">
+                <button id="reportPrevMonth"
+                    class="glass rounded-full w-9 h-9 flex items-center justify-center active:scale-90 transition-transform">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                </button>
+                <p id="reportMonthLabel" class="font-display text-sm font-medium">—</p>
+                <button id="reportNextMonth"
+                    class="glass rounded-full w-9 h-9 flex items-center justify-center active:scale-90 transition-transform">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2">
+                        <path d="M9 18l6-6-6-6" />
+                    </svg>
+                </button>
+            </div>
+            <div id="reportBody" class="overflow-y-auto pr-0.5" style="flex:1">
+                <p class="text-[11px] uppercase tracking-[0.18em] font-mono mb-2" style="color:var(--ink-dimmer)">
+                    Daily schedule</p>
+                <div id="reportScheduleWrap" class="report-scroll mb-5"></div>
+                <div id="reportClientSection" class="hidden">
+                    <p class="text-[11px] uppercase tracking-[0.18em] font-mono mb-2" style="color:var(--ink-dimmer)">
+                        Client work — time logged</p>
+                    <div id="reportClientWrap" class="report-scroll"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         /* ================= Default backend ================= */
         const DEFAULT_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyY6drwQfPgeD8iFsOSZO2RAuo_VMg2I-EG1ktZEUCsJOb_WubckQi3I2NpK4PV4S0/exec";
 
-        /* ================= Storage helpers (local cache) ================= */
+        /* ================= Storage helpers (local cache) =================
+           window.storage only exists inside Claude.ai's own artifact preview
+           sandbox — it is NOT a real browser API. On a page hosted on its
+           own domain or installed as a home-screen PWA (the actual target
+           here, given the Apps Script backend and apple-mobile-web-app
+           meta tags), window.storage is undefined, so every get/set used
+           to throw immediately, get silently caught, and fall back to the
+           empty default — meaning nothing ever actually persisted, which
+           is why the streak and week/9-day grids always read as 0%.
+           Fix: use localStorage as the real, standard, per-device
+           persistent store. window.storage is still tried first and used
+           when present, so this keeps working if the file is ever
+           previewed inside a Claude artifact too. */
+        const LOCAL_PREFIX = 'dini-hub:';
+        function hasArtifactStorage() {
+            return typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function';
+        }
         async function getStore(key, fallback) {
-            try { const res = await window.storage.get(key, false); return res ? JSON.parse(res.value) : fallback; }
-            catch (e) { return fallback; }
+            if (hasArtifactStorage()) {
+                try { const res = await window.storage.get(key, false); return res ? JSON.parse(res.value) : fallback; }
+                catch (e) { /* fall through to localStorage */ }
+            }
+            try {
+                const raw = localStorage.getItem(LOCAL_PREFIX + key);
+                return raw === null ? fallback : JSON.parse(raw);
+            } catch (e) { return fallback; }
         }
         async function setStore(key, value) {
-            try { await window.storage.set(key, JSON.stringify(value), false); }
+            if (hasArtifactStorage()) {
+                try { await window.storage.set(key, JSON.stringify(value), false); return; }
+                catch (e) { /* fall through to localStorage */ }
+            }
+            try { localStorage.setItem(LOCAL_PREFIX + key, JSON.stringify(value)); }
             catch (e) { console.error('storage set failed', e); }
         }
         async function getSettings() {
@@ -1344,11 +1502,13 @@
     </div>
     <p class="text-[11px] uppercase tracking-[0.18em] font-mono mt-6 mb-2.5" style="color:var(--ink-dimmer)">Last 9 days</p>
     <div class="grid grid-cols-3 gap-2.5">${grid}</div>
+    <button id="openMonthReportBtn" class="w-full mt-5 glass rounded-2xl py-3 text-xs font-mono">View month report</button>
     <p class="text-[10px] mt-4 text-center" style="color:var(--ink-dimmer)">Photos stay on this device — Sheets syncs your name and stats only.</p>
   `;
 
             document.getElementById('avatarBtn').addEventListener('click', () => document.getElementById('photoInput').click());
             document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
+            document.getElementById('openMonthReportBtn').addEventListener('click', openMonthReport);
         }
         function handlePhotoUpload(e) {
             const file = e.target.files[0];
@@ -1372,6 +1532,86 @@
             await setStore('profile', profile);
             sheetsCall('saveProfile', { name: profile.name || 'Dini' });
             renderProfile();
+        }
+
+        /* ================= Month Report ================= */
+        let reportMonthOffset = 0; // 0 = current month, -1 = previous month, etc. Never allowed to go positive (future).
+        function reportMonthDate(offset) {
+            const d = new Date();
+            d.setDate(1);
+            d.setMonth(d.getMonth() + offset);
+            return d;
+        }
+        function dateKeyFor(year, month, day) {
+            // Same construction style as dateKeysBack()/todayKey() elsewhere in
+            // the app, so day keys line up with what's already stored.
+            return new Date(year, month, day).toISOString().slice(0, 10);
+        }
+        async function openMonthReport() {
+            reportMonthOffset = 0;
+            await renderMonthReport();
+            const overlay = document.getElementById('monthReportOverlay');
+            overlay.classList.remove('hidden'); overlay.classList.add('flex');
+            gsap.fromTo(overlay.firstElementChild, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: 'power3.out' });
+        }
+        function closeMonthReport() {
+            document.getElementById('monthReportOverlay').classList.add('hidden');
+            document.getElementById('monthReportOverlay').classList.remove('flex');
+        }
+        async function renderMonthReport() {
+            const base = reportMonthDate(reportMonthOffset);
+            const year = base.getFullYear(), month = base.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            document.getElementById('reportMonthLabel').textContent = base.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+            document.getElementById('reportNextMonth').classList.toggle('opacity-30', reportMonthOffset >= 0);
+            document.getElementById('reportNextMonth').classList.toggle('pointer-events-none', reportMonthOffset >= 0);
+
+            const todayStr = todayKey();
+            const dayKeys = [];
+            for (let d = 1; d <= daysInMonth; d++) dayKeys.push(dateKeyFor(year, month, d));
+
+            const progressByDay = {};
+            for (const k of dayKeys) progressByDay[k] = await getStore('timetable:' + k, {});
+
+            const headerCells = dayKeys.map((k, i) =>
+                `<th class="report-daynum ${k === todayStr ? 'is-today' : ''}">${i + 1}</th>`).join('');
+
+            const scheduleRows = SCHEDULE.map(item => {
+                const cells = dayKeys.map(k => {
+                    if (k > todayStr) return `<td class="report-cell"></td>`;
+                    const done = !!progressByDay[k][item.id];
+                    return `<td class="report-cell">${done ? '<span class="report-check">✓</span>' : ''}</td>`;
+                }).join('');
+                return `<tr><th class="report-rowhead" title="${item.title.replace(/"/g, '&quot;')}">${item.title}</th>${cells}</tr>`;
+            }).join('');
+
+            document.getElementById('reportScheduleWrap').innerHTML = `
+    <table class="report-table">
+      <thead><tr><th class="report-rowhead-header">Block</th>${headerCells}</tr></thead>
+      <tbody>${scheduleRows}</tbody>
+    </table>`;
+
+            const tasks = await loadTasksCache();
+            const monthTasks = tasks.filter(t => (t.timeLog || []).some(e => dayKeys.includes(e.date)));
+            const clientSection = document.getElementById('reportClientSection');
+            if (monthTasks.length) {
+                const taskRows = monthTasks.map(t => {
+                    const cells = dayKeys.map(k => {
+                        const entry = (t.timeLog || []).find(e => e.date === k);
+                        return `<td class="report-cell">${entry ? `<span class="report-time">${minutesToLabel(entry.minutes)}</span>` : ''}</td>`;
+                    }).join('');
+                    const label = `${t.clientId} — ${t.description}`;
+                    return `<tr><th class="report-rowhead" title="${label.replace(/"/g, '&quot;')}">${label}</th>${cells}</tr>`;
+                }).join('');
+                document.getElementById('reportClientWrap').innerHTML = `
+    <table class="report-table">
+      <thead><tr><th class="report-rowhead-header">Task</th>${headerCells}</tr></thead>
+      <tbody>${taskRows}</tbody>
+    </table>`;
+                clientSection.classList.remove('hidden');
+            } else {
+                clientSection.classList.add('hidden');
+            }
         }
 
         /* ================= Tabs ================= */
@@ -1475,6 +1715,9 @@
             document.getElementById('overrideClose').addEventListener('click', closeOverride);
             document.getElementById('saveOverrideBtn').addEventListener('click', saveOverride);
             document.getElementById('clearOverrideBtn').addEventListener('click', clearOverride);
+            document.getElementById('monthReportClose').addEventListener('click', closeMonthReport);
+            document.getElementById('reportPrevMonth').addEventListener('click', () => { reportMonthOffset--; renderMonthReport(); });
+            document.getElementById('reportNextMonth').addEventListener('click', () => { if (reportMonthOffset < 0) { reportMonthOffset++; renderMonthReport(); } });
             document.getElementById('enableAlarmsBtn').addEventListener('click', async () => {
                 if ('Notification' in window) { try { await Notification.requestPermission(); } catch (e) { } }
                 try {
