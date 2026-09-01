@@ -41,9 +41,9 @@
             padding: 0;
             width: 100%;
             overflow-x: hidden;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            height: 100%;
+            overflow-y: auto;             
+            -webkit-overflow-scrolling: touch; 
+            height: 100%; 
         }
 
         body {
@@ -505,6 +505,28 @@
         </div>
     </div>
 
+    <!-- 5-minute check-in (auto-opens from the alarm) -->
+    <div id="checkinOverlay"
+        class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
+        <div class="glass-strong rounded-3xl w-full max-w-sm p-6 overflow-hidden">
+            <div class="flex items-center justify-between mb-1">
+                <div>
+                    <h2 class="font-display text-lg font-semibold">5 minutes left</h2>
+                    <p id="checkinBlockTitle" class="text-xs mt-0.5" style="color:var(--ink-dimmer)">—</p>
+                </div>
+                <button id="checkinClose" class="w-8 h-8 rounded-full flex items-center justify-center glass shrink-0"><svg
+                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg></button>
+            </div>
+            <div class="w-full h-1 rounded-full bg-white/10 mb-5 mt-3 overflow-hidden">
+                <div id="checkinProgress" class="h-full bg-white transition-all duration-300" style="width:16%"></div>
+            </div>
+            <div id="checkinBody" class="min-h-[150px]"></div>
+            <button id="checkinNextBtn" class="w-full mt-6 glass rounded-2xl py-3 text-sm font-mono">Skip</button>
+        </div>
+    </div>
+
     <!-- Settings Panel -->
     <div id="settingsOverlay"
         class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 overflow-y-auto">
@@ -621,7 +643,7 @@
     <!-- Month Report Modal -->
     <div id="monthReportOverlay"
         class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
-        <div class="glass-strong rounded-3xl w-100 p-6 flex flex-col" style="max-height:85vh">
+        <div class="glass-strong rounded-3xl w-full max-w-lg p-6 flex flex-col" style="max-height:85vh">
             <div class="flex items-center justify-between mb-1 shrink-0">
                 <h2 class="font-display text-lg font-semibold">Month report</h2>
                 <button id="monthReportClose"
@@ -702,7 +724,21 @@
             if (!settings.sheetsUrl) settings.sheetsUrl = DEFAULT_SHEETS_URL;
             return settings;
         }
-        function todayKey() { return new Date().toISOString().slice(0, 10); }
+        /* Builds a YYYY-MM-DD key from a Date's LOCAL fields — never via
+           .toISOString(), which converts to UTC first. For any positive
+           UTC offset (e.g. IST, +5:30), local midnight on day N is still
+           the previous day in UTC, so toISOString().slice(0,10) silently
+           returns the wrong date. This is the single source of truth for
+           every date key in the app now — todayKey(), dateKeysBack(), and
+           the month report all funnel through it so a given calendar day
+           always produces the same key everywhere. */
+        function localDateKey(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+        function todayKey() { return localDateKey(new Date()); }
         function minutesToLabel(m) {
             if (!m) return '0m';
             const h = Math.floor(m / 60), mm = m % 60;
@@ -710,7 +746,7 @@
         }
         function dateKeysBack(n) {
             const out = [];
-            for (let i = n - 1; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); out.push(d.toISOString().slice(0, 10)); }
+            for (let i = n - 1; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); out.push(localDateKey(d)); }
             return out;
         }
         function relativeDateLabel(task) {
@@ -994,6 +1030,14 @@
             }
             if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
             playAlarmSound(settings.alarmUrl);
+            if (!isAnyOverlayOpen()) openCheckin(block);
+        }
+        function isAnyOverlayOpen() {
+            const ids = ['modalOverlay', 'reflectionOverlay', 'settingsOverlay', 'logTimeOverlay', 'overrideOverlay', 'monthReportOverlay', 'checkinOverlay'];
+            return ids.some(id => {
+                const el = document.getElementById(id);
+                return el && !el.classList.contains('hidden');
+            });
         }
         function playAlarmSound(customUrl) {
             if (customUrl) { const audio = new Audio(customUrl); audio.play().catch(() => { }); return; }
@@ -1467,6 +1511,72 @@
             document.getElementById('reflectionOverlay').classList.remove('flex');
         }
 
+        /* ================= 5-minute check-in wizard =================
+           Auto-opens from fireAlarm() when a timetable block has 5
+           minutes left. Same wizard pattern as the reflection flow above,
+           but keyed to a schedule block + today's date rather than a
+           client task, and saved separately (locally + to a "Checkins"
+           tab in the Sheet) so it never collides with task reflections. */
+        const CHECKIN_STEPS = [
+            { key: 'mood', prompt: "How's this block going?", type: 'choice', options: ['Great', 'Okay', 'Struggling'] },
+            { key: 'onTrack', prompt: 'Will you finish on time?', type: 'choice', options: ['Yes', 'Need a bit more', 'No'] },
+            { key: 'focus', prompt: 'Staying focused?', type: 'choice', options: ['Fully focused', 'Some distractions', 'Lost focus'] },
+            { key: 'energy', prompt: 'Energy level right now?', type: 'scale' },
+            { key: 'blocker', prompt: 'Anything holding you back?', type: 'choice', options: ['Nothing', 'Interruption', 'Waiting on someone', 'Technical issue'] },
+            { key: 'notes', prompt: 'Anything worth noting?', type: 'text' }
+        ];
+        let checkinBlock = null, checkinAnswers = {}, checkinStepIdx = 0;
+        function openCheckin(block) {
+            checkinBlock = block; checkinAnswers = {}; checkinStepIdx = 0;
+            document.getElementById('checkinBlockTitle').textContent = block.title;
+            const overlay = document.getElementById('checkinOverlay');
+            overlay.classList.remove('hidden'); overlay.classList.add('flex');
+            gsap.fromTo(overlay.firstElementChild, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: 'power3.out' });
+            renderCheckinStep(1);
+        }
+        function renderCheckinStep(dir) {
+            const step = CHECKIN_STEPS[checkinStepIdx];
+            const body = document.getElementById('checkinBody');
+            let html = `<p class="text-base font-medium mb-4">${step.prompt}</p>`;
+            if (step.type === 'choice') {
+                html += `<div class="flex flex-col gap-2">` + step.options.map(o => `<button class="reflection-choice glass rounded-xl py-3 text-sm ${checkinAnswers[step.key] === o ? 'active' : ''}" data-value="${o}">${o}</button>`).join('') + `</div>`;
+            } else if (step.type === 'scale') {
+                html += `<div class="flex gap-2 justify-between">` + [1, 2, 3, 4, 5].map(n => `<button class="reflection-scale glass rounded-full w-11 h-11 flex items-center justify-center font-mono text-sm ${checkinAnswers[step.key] === n ? 'active' : ''}" data-value="${n}">${n}</button>`).join('') + `</div>`;
+            } else if (step.type === 'text') {
+                html += `<textarea id="checkinNotes" rows="3" placeholder="Optional notes..." class="w-full bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm resize-none placeholder:text-white/25">${checkinAnswers[step.key] || ''}</textarea>`;
+            }
+            body.innerHTML = html;
+            gsap.fromTo(body, { x: dir > 0 ? 24 : -24, opacity: 0 }, { x: 0, opacity: 1, duration: 0.28, ease: 'power2.out' });
+
+            body.querySelectorAll('.reflection-choice').forEach(btn => btn.addEventListener('click', () => { checkinAnswers[step.key] = btn.dataset.value; nextCheckinStep(); }));
+            body.querySelectorAll('.reflection-scale').forEach(btn => btn.addEventListener('click', () => { checkinAnswers[step.key] = parseInt(btn.dataset.value, 10); nextCheckinStep(); }));
+
+            document.getElementById('checkinNextBtn').textContent = checkinStepIdx === CHECKIN_STEPS.length - 1 ? 'Finish' : 'Skip';
+            document.getElementById('checkinProgress').style.width = ((checkinStepIdx + 1) / CHECKIN_STEPS.length * 100) + '%';
+        }
+        function nextCheckinStep() {
+            if (checkinStepIdx < CHECKIN_STEPS.length - 1) { checkinStepIdx++; renderCheckinStep(1); }
+            else finishCheckin();
+        }
+        async function finishCheckin() {
+            const lastStep = CHECKIN_STEPS[CHECKIN_STEPS.length - 1];
+            if (lastStep.type === 'text') {
+                const notesEl = document.getElementById('checkinNotes');
+                if (notesEl) checkinAnswers.notes = notesEl.value;
+            }
+            const date = todayKey();
+            const all = await getStore('checkins:' + date, {});
+            all[checkinBlock.id] = checkinAnswers;
+            await setStore('checkins:' + date, all);
+            sheetsCall('saveCheckin', { date, block: checkinBlock.id, blockTitle: checkinBlock.title, ...checkinAnswers });
+            closeCheckin();
+        }
+        function closeCheckin() {
+            document.getElementById('checkinOverlay').classList.add('hidden');
+            document.getElementById('checkinOverlay').classList.remove('flex');
+            checkinBlock = null;
+        }
+
         /* ================= Profile ================= */
         async function renderProfile() {
             const container = document.getElementById('view-profile');
@@ -1543,9 +1653,7 @@
             return d;
         }
         function dateKeyFor(year, month, day) {
-            // Same construction style as dateKeysBack()/todayKey() elsewhere in
-            // the app, so day keys line up with what's already stored.
-            return new Date(year, month, day).toISOString().slice(0, 10);
+            return localDateKey(new Date(year, month, day));
         }
         async function openMonthReport() {
             reportMonthOffset = 0;
@@ -1688,6 +1796,12 @@
             document.getElementById('reflectionNextBtn').addEventListener('click', () => {
                 const step = REFLECTION_STEPS[reflectionStepIdx];
                 if (step.type === 'text') finishReflection(); else nextReflectionStep();
+            });
+
+            document.getElementById('checkinClose').addEventListener('click', closeCheckin);
+            document.getElementById('checkinNextBtn').addEventListener('click', () => {
+                const step = CHECKIN_STEPS[checkinStepIdx];
+                if (step.type === 'text') finishCheckin(); else nextCheckinStep();
             });
 
             document.getElementById('toastUndo').addEventListener('click', async () => {
