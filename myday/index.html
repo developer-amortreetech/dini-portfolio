@@ -453,6 +453,9 @@
     </div>
 
     <script>
+        /* ================= Default backend ================= */
+        const DEFAULT_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyY6drwQfPgeD8iFsOSZO2RAuo_VMg2I-EG1ktZEUCsJOb_WubckQi3I2NpK4PV4S0/exec";
+
         /* ================= Storage helpers (local cache) ================= */
         async function getStore(key, fallback) {
             try { const res = await window.storage.get(key, false); return res ? JSON.parse(res.value) : fallback; }
@@ -461,6 +464,11 @@
         async function setStore(key, value) {
             try { await window.storage.set(key, JSON.stringify(value), false); }
             catch (e) { console.error('storage set failed', e); }
+        }
+        async function getSettings() {
+            const settings = await getStore('settings', {});
+            if (!settings.sheetsUrl) settings.sheetsUrl = DEFAULT_SHEETS_URL;
+            return settings;
         }
         function todayKey() { return new Date().toISOString().slice(0, 10); }
         function minutesToLabel(m) {
@@ -506,7 +514,7 @@
             });
         }
         async function sheetsCall(action, payloadObj) {
-            const settings = await getStore('settings', {});
+            const settings = await getSettings();
             if (!settings.sheetsUrl) return { status: 'no-url' };
             try {
                 const res = await jsonp(settings.sheetsUrl, { action, payload: JSON.stringify(payloadObj || {}) });
@@ -521,7 +529,7 @@
             }
         }
         async function retryQueue() {
-            const settings = await getStore('settings', {});
+            const settings = await getSettings();
             if (!settings.sheetsUrl) { updateSyncBadge(0, true); return; }
             let queue = await getStore('sync-queue', []);
             if (!queue.length) { updateSyncBadge(0, false); return; }
@@ -534,7 +542,7 @@
             updateSyncBadge(remaining.length, false);
         }
         async function updateSyncBadgeFromQueue() {
-            const settings = await getStore('settings', {});
+            const settings = await getSettings();
             const queue = await getStore('sync-queue', []);
             updateSyncBadge(queue.length, !settings.sheetsUrl);
         }
@@ -549,7 +557,7 @@
             else { statusText.textContent = count + ' item' + (count > 1 ? 's' : '') + ' pending'; statusSub.textContent = 'Will retry automatically, or tap Retry now'; }
         }
         async function restoreFromSheets() {
-            const settings = await getStore('settings', {});
+            const settings = await getSettings();
             if (!settings.sheetsUrl) { showToast("Add your Sheets URL first"); return; }
             try {
                 const res = await jsonp(settings.sheetsUrl, { action: 'getAll' });
@@ -633,7 +641,7 @@
             }
         }
         async function fireAlarm(block) {
-            const settings = await getStore('settings', {});
+            const settings = await getSettings();
             if ('Notification' in window && Notification.permission === 'granted') {
                 try { new Notification('5 minutes left', { body: block.title }); } catch (e) { }
             }
@@ -1150,8 +1158,9 @@
 
         /* ================= Settings ================= */
         async function openSettings() {
-            const settings = await getStore('settings', {});
-            document.getElementById('inputSheetsUrl').value = settings.sheetsUrl || '';
+            const settings = await getSettings();
+            document.getElementById('inputSheetsUrl').value = settings.sheetsUrl === DEFAULT_SHEETS_URL ? '' : (settings.sheetsUrl || '');
+            document.getElementById('inputSheetsUrl').placeholder = DEFAULT_SHEETS_URL;
             document.getElementById('inputAlarmUrl').value = settings.alarmUrl || '';
             await updateSyncBadgeFromQueue();
             const overlay = document.getElementById('settingsOverlay');
@@ -1219,7 +1228,7 @@
             document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
                 const url = document.getElementById('inputSheetsUrl').value.trim();
                 const alarmUrl = document.getElementById('inputAlarmUrl').value.trim();
-                await setStore('settings', { sheetsUrl: url, alarmUrl });
+                await setStore('settings', { sheetsUrl: url || DEFAULT_SHEETS_URL, alarmUrl });
                 closeSettings();
                 retryQueue();
             });
