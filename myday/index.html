@@ -230,6 +230,26 @@
             background: var(--glass-bg-strong);
             border-color: rgba(255, 255, 255, 0.4);
         }
+
+        .edit-block-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .swapped-tag {
+            font-size: 9px;
+            letter-spacing: 0.08em;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            border: 1px solid var(--glass-border);
+            color: var(--ink-dim);
+            text-transform: uppercase;
+        }
     </style>
 </head>
 
@@ -407,6 +427,20 @@
             <button id="restoreBtn" class="w-full mt-2 glass rounded-2xl py-2.5 text-xs font-mono">Restore from
                 Sheets</button>
 
+            <p class="text-[11px] uppercase tracking-wider font-mono mb-2 mt-6" style="color:var(--ink-dimmer)">
+                Timetable schedule</p>
+            <p class="text-xs leading-relaxed mb-3" style="color:var(--ink-dim)">Your daily blocks now live in a
+                "Schedule" tab in the same Sheet. Edit, reorder, add, or rename rows there — then refresh here to pull
+                the changes in.</p>
+            <div class="glass rounded-2xl px-4 py-3 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium" id="scheduleSyncedText">Never synced</p>
+                    <p class="text-[10px] mt-0.5" style="color:var(--ink-dimmer)">Local copy is used if the Sheet is
+                        unreachable</p>
+                </div>
+                <button id="refreshScheduleBtn" class="quick-log-btn">Refresh</button>
+            </div>
+
             <p class="text-[11px] uppercase tracking-wider font-mono mb-2 mt-6" style="color:var(--ink-dimmer)">Alarms
             </p>
             <p class="text-xs leading-relaxed mb-3" style="color:var(--ink-dim)">A 5-minute warning plays before each
@@ -448,6 +482,31 @@
                 <input id="customMinutesInput" type="number" min="1" placeholder="Custom minutes"
                     class="flex-1 bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm font-mono placeholder:text-white/25">
                 <button id="addCustomMinutesBtn" class="quick-log-btn px-4">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Swap / Override Modal -->
+    <div id="overrideOverlay"
+        class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
+        <div class="glass-strong rounded-3xl w-full max-w-sm p-6">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="font-display text-lg font-semibold">What did you actually do?</h2>
+                <button id="overrideClose"
+                    class="w-8 h-8 rounded-full flex items-center justify-center glass shrink-0"><svg width="14"
+                        height="14" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg></button>
+            </div>
+            <p id="overridePlanned" class="text-xs mb-4" style="color:var(--ink-dimmer)">Planned: —</p>
+            <textarea id="overrideInput" rows="2" placeholder="What you actually worked on..."
+                class="w-full bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm resize-none placeholder:text-white/25"></textarea>
+            <div class="flex gap-3 mt-6">
+                <button id="clearOverrideBtn"
+                    class="flex-1 glass rounded-2xl py-3 text-xs font-mono active:scale-95 transition-transform">Clear
+                    swap</button>
+                <button id="saveOverrideBtn"
+                    class="flex-1 bg-[#f5f5f3] text-black font-display font-semibold rounded-2xl py-3 text-sm active:scale-95 transition-transform">Save</button>
             </div>
         </div>
     </div>
@@ -567,7 +626,8 @@
                     startDate: r.startDate, endDate: r.endDate, status: r.status || 'not-started',
                     completed: r.status === 'done',
                     timeLog: r.totalMinutes ? [{ date: todayKey(), minutes: Number(r.totalMinutes) }] : [],
-                    createdAt: r.updatedAt || new Date().toISOString()
+                    createdAt: r.updatedAt || new Date().toISOString(),
+                    updatedAt: r.updatedAt || new Date().toISOString()
                 }));
                 tasksCache = tasks;
                 await persistTasksCache();
@@ -580,6 +640,76 @@
                 await renderTimetable(); await renderClientTasks();
                 showToast('Restored from Sheets');
             } catch (e) { showToast('Restore failed — check your Sheets URL'); }
+        }
+
+        /* ---- Auto-merge on load: pulls Sheets data in WITHOUT clobbering local
+               changes that haven't synced yet. Unlike restoreFromSheets() (a full
+               overwrite, only run when the user explicitly taps the button), this
+               only fills gaps: it adds tasks/blocks the local cache doesn't know
+               about yet, and only overwrites a local task when the remote copy is
+               provably newer (updatedAt comparison). It never deletes anything
+               locally — a task or checkmark that only exists locally (e.g. still
+               sitting in the offline sync-queue) is left alone. ---- */
+        async function mergeTasksFromRemote(remoteRows) {
+            const tasks = await loadTasksCache();
+            const byId = {};
+            tasks.forEach(t => byId[t.id] = t);
+            let changed = false;
+            remoteRows.forEach(r => {
+                const id = String(r.id);
+                const local = byId[id];
+                if (!local) {
+                    tasks.push({
+                        id, clientId: r.clientId, description: r.description,
+                        startDate: r.startDate, endDate: r.endDate, status: r.status || 'not-started',
+                        completed: r.status === 'done',
+                        timeLog: r.totalMinutes ? [{ date: todayKey(), minutes: Number(r.totalMinutes) }] : [],
+                        createdAt: r.updatedAt || new Date().toISOString(),
+                        updatedAt: r.updatedAt || new Date().toISOString()
+                    });
+                    changed = true;
+                    return;
+                }
+                const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
+                const remoteTime = new Date(r.updatedAt || 0).getTime();
+                if (remoteTime > localTime) {
+                    Object.assign(local, {
+                        clientId: r.clientId, description: r.description, startDate: r.startDate,
+                        endDate: r.endDate, status: r.status || 'not-started', completed: r.status === 'done',
+                        updatedAt: r.updatedAt
+                    });
+                    changed = true;
+                }
+            });
+            if (changed) { tasksCache = tasks; await persistTasksCache(); }
+        }
+        async function mergeTimetableFromRemote(remoteRows) {
+            const byDate = {};
+            remoteRows.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
+            for (const date in byDate) {
+                const progress = await getStore('timetable:' + date, {});
+                let changed = false;
+                byDate[date].forEach(r => {
+                    if (!(r.block in progress)) {
+                        progress[r.block] = (r.completed === true || String(r.completed) === 'true');
+                        changed = true;
+                    }
+                });
+                if (changed) await setStore('timetable:' + date, progress);
+            }
+        }
+        async function autoMergeFromSheets() {
+            const settings = await getSettings();
+            if (!settings.sheetsUrl) return;
+            try {
+                const res = await jsonp(settings.sheetsUrl, { action: 'getAll' });
+                if (res.status !== 'ok') return;
+                await mergeTasksFromRemote(res.clientTasks || []);
+                await mergeTimetableFromRemote(res.timetable || []);
+            } catch (e) {
+                // offline or unreachable — silently keep the local cache as-is,
+                // same graceful fallback pattern used by initSchedule()
+            }
         }
 
         /* ================= Schedule data ================= */
@@ -601,7 +731,51 @@
             ['planday', '9:00–9:30', "Plan tomorrow's top 3 tasks", 'Evening', 21, 0, 21, 30],
             ['winddown', '9:30–11:00', 'Wind down, sleep prep', 'Evening', 21, 30, 23, 0],
         ];
-        const SCHEDULE = RAW_SCHEDULE.map(r => ({ id: r[0], time: r[1], title: r[2], group: r[3], start: r[4] * 60 + r[5], end: r[6] * 60 + r[7] }));
+        const BUILTIN_SCHEDULE = RAW_SCHEDULE.map((r, i) => ({ id: r[0], time: r[1], title: r[2], group: r[3], start: r[4] * 60 + r[5], end: r[6] * 60 + r[7], order: i }));
+        let SCHEDULE = BUILTIN_SCHEDULE.slice();
+
+        /* ---- Schedule sync (Google Sheets "Schedule" tab) ---- */
+        function parseTimeToMinutes(str) {
+            const parts = String(str).split(':');
+            const h = parseInt(parts[0], 10) || 0, m = parseInt(parts[1], 10) || 0;
+            return h * 60 + m;
+        }
+        function parseScheduleRow(r, idx) {
+            const start = parseTimeToMinutes(r.startTime);
+            const end = parseTimeToMinutes(r.endTime);
+            return { id: String(r.id), time: `${r.startTime}–${r.endTime}`, title: r.title, group: r.group || 'Schedule', start, end, order: (r.order !== undefined && r.order !== '') ? Number(r.order) : idx };
+        }
+        async function fetchAndCacheSchedule(announce) {
+            const settings = await getSettings();
+            if (!settings.sheetsUrl) { if (announce) showToast('Add your Sheets URL first'); return null; }
+            try {
+                const res = await jsonp(settings.sheetsUrl, { action: 'getSchedule' });
+                if (res.status !== 'ok' || !Array.isArray(res.schedule) || !res.schedule.length) throw new Error('empty');
+                const parsed = res.schedule.map(parseScheduleRow).sort((a, b) => a.order - b.order);
+                await setStore('schedule-cache', parsed);
+                await setStore('schedule-last-synced', Date.now());
+                if (announce) showToast('Schedule refreshed');
+                return parsed;
+            } catch (e) {
+                if (announce) showToast('Could not refresh schedule — check your Sheets URL');
+                return null;
+            }
+        }
+        async function initSchedule() {
+            const cached = await getStore('schedule-cache', null);
+            if (cached && cached.length) SCHEDULE = cached;
+            const fetched = await fetchAndCacheSchedule(false);
+            if (fetched && fetched.length) SCHEDULE = fetched;
+        }
+        function formatLastSynced(ts) {
+            if (!ts) return 'Never synced';
+            const mins = Math.round((Date.now() - ts) / 60000);
+            if (mins < 1) return 'Synced just now';
+            if (mins < 60) return `Synced ${mins}m ago`;
+            const hrs = Math.round(mins / 60);
+            if (hrs < 24) return `Synced ${hrs}h ago`;
+            return `Synced ${Math.round(hrs / 24)}d ago`;
+        }
 
         function getCurrentBlockId() {
             const now = new Date();
@@ -682,6 +856,7 @@
         async function renderTimetable() {
             const container = document.getElementById('view-timetable');
             const progress = await getStore('timetable:' + todayKey(), {});
+            const overrides = await getStore('override:' + todayKey(), {});
             const currentId = getCurrentBlockId();
             let groups = {};
             SCHEDULE.forEach(item => { (groups[item.group] = groups[item.group] || []).push(item); });
@@ -692,6 +867,8 @@
                 groups[groupName].forEach(item => {
                     const done = !!progress[item.id];
                     const isNow = item.id === currentId;
+                    const ov = overrides[item.id];
+                    const displayTitle = ov ? ov.actualTitle : item.title;
                     html += `
       <div class="glass rounded-2xl px-4 py-3.5 mb-2.5 flex items-center gap-3.5 task-card ${isNow ? 'now' : ''}" data-block="${item.id}" id="block-${item.id}">
         <button class="checkbox-toggle checkbox-ring ${done ? 'done' : ''}" data-block="${item.id}">
@@ -699,14 +876,19 @@
         </button>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <p class="text-sm font-medium leading-snug ${done ? 'line-through' : ''}" style="${done ? 'color:var(--ink-dimmer)' : ''}">${item.title}</p>
+            <p class="text-sm font-medium leading-snug ${done ? 'line-through' : ''}" style="${done ? 'color:var(--ink-dimmer)' : ''}">${displayTitle}</p>
             ${isNow ? '<span class="now-badge shrink-0 flex items-center gap-1"><span class="pulse-dot"></span>NOW</span>' : ''}
+            ${ov ? '<span class="swapped-tag shrink-0">Swapped</span>' : ''}
           </div>
+          ${ov ? `<p class="text-[11px] mt-0.5 line-through" style="color:var(--ink-dimmer)">${item.title}</p>` : ''}
           <div class="flex items-center gap-2 mt-0.5">
             <p class="text-[11px] font-mono" style="color:var(--ink-dimmer)">${item.time}</p>
             ${isNow ? `<p id="countdown-${item.id}" class="text-[11px] font-mono" style="color:var(--ink-dim)"></p>` : ''}
           </div>
         </div>
+        <button class="edit-block-btn glass shrink-0" data-block="${item.id}" data-title="${item.title.replace(/"/g, '&quot;')}">
+          ${ICONS.edit}
+        </button>
       </div>`;
                 });
             });
@@ -725,6 +907,9 @@
                     sheetsCall('toggleBlock', { date: todayKey(), block: blockId, completed: prog[blockId] });
                     renderTimetable();
                 });
+            });
+            document.querySelectorAll('.edit-block-btn').forEach(btn => {
+                btn.addEventListener('click', () => openOverride(btn.dataset.block, btn.dataset.title));
             });
         }
         async function getWeekCompletionData() {
@@ -867,6 +1052,7 @@
                     const cur = normalizedStatus(t);
                     const next = STATUS_ORDER[(STATUS_ORDER.indexOf(cur) + 1) % STATUS_ORDER.length];
                     t.status = next; t.completed = next === 'done';
+                    t.updatedAt = new Date().toISOString();
                     await persistTasksCache();
                     sheetsCall('upsertTask', { id: t.id, clientId: t.clientId, description: t.description, startDate: t.startDate, endDate: t.endDate, status: next, totalMinutes: taskTotalMinutes(t) });
                     gsap.fromTo(btn, { scale: 0.9 }, { scale: 1, duration: 0.3, ease: 'back.out(2)' });
@@ -962,12 +1148,13 @@
 
             const tasks = await loadTasksCache();
             const status = editingTaskId ? selectedStatus : defaultStatusForDates(startDate, endDate);
+            const nowIso = new Date().toISOString();
             let taskRef;
             if (editingTaskId) {
                 taskRef = tasks.find(x => x.id === editingTaskId);
-                if (taskRef) Object.assign(taskRef, { clientId, description, startDate, endDate, status, completed: status === 'done' });
+                if (taskRef) Object.assign(taskRef, { clientId, description, startDate, endDate, status, completed: status === 'done', updatedAt: nowIso });
             } else {
-                taskRef = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), clientId, description, startDate, endDate, status, completed: status === 'done', timeLog: [], createdAt: new Date().toISOString() };
+                taskRef = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), clientId, description, startDate, endDate, status, completed: status === 'done', timeLog: [], createdAt: nowIso, updatedAt: nowIso };
                 tasks.push(taskRef);
             }
             await persistTasksCache();
@@ -985,6 +1172,7 @@
             t.timeLog = t.timeLog || [];
             const entry = t.timeLog.find(e => e.date === todayKey());
             if (entry) entry.minutes += minutes; else t.timeLog.push({ date: todayKey(), minutes });
+            t.updatedAt = new Date().toISOString();
             await persistTasksCache();
             sheetsCall('upsertTask', { id: t.id, clientId: t.clientId, description: t.description, startDate: t.startDate, endDate: t.endDate, status: normalizedStatus(t), totalMinutes: taskTotalMinutes(t) });
             return t;
@@ -1004,6 +1192,48 @@
             document.getElementById('logTimeOverlay').classList.remove('flex');
             activeLogTaskId = null;
             renderClientTasks();
+        }
+
+        /* ================= Swap / Override modal ================= */
+        let activeOverrideBlockId = null;
+        let activeOverridePlannedTitle = null;
+        async function openOverride(blockId, plannedTitle) {
+            activeOverrideBlockId = blockId;
+            activeOverridePlannedTitle = plannedTitle;
+            const overrides = await getStore('override:' + todayKey(), {});
+            const existing = overrides[blockId];
+            document.getElementById('overridePlanned').textContent = 'Planned: ' + plannedTitle;
+            document.getElementById('overrideInput').value = existing ? existing.actualTitle : '';
+            const overlay = document.getElementById('overrideOverlay');
+            overlay.classList.remove('hidden'); overlay.classList.add('flex');
+            gsap.fromTo(overlay.firstElementChild, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: 'power3.out' });
+        }
+        function closeOverride() {
+            document.getElementById('overrideOverlay').classList.add('hidden');
+            document.getElementById('overrideOverlay').classList.remove('flex');
+            activeOverrideBlockId = null;
+        }
+        async function saveOverride() {
+            if (!activeOverrideBlockId) return;
+            const val = document.getElementById('overrideInput').value.trim();
+            if (!val) { closeOverride(); return; }
+            const overrides = await getStore('override:' + todayKey(), {});
+            overrides[activeOverrideBlockId] = { actualTitle: val, plannedTitle: activeOverridePlannedTitle, updatedAt: new Date().toISOString() };
+            await setStore('override:' + todayKey(), overrides);
+            const progress = await getStore('timetable:' + todayKey(), {});
+            sheetsCall('logOverride', { date: todayKey(), block: activeOverrideBlockId, plannedTitle: activeOverridePlannedTitle, actualTitle: val, completed: !!progress[activeOverrideBlockId] });
+            closeOverride();
+            renderTimetable();
+        }
+        async function clearOverride() {
+            if (!activeOverrideBlockId) return;
+            const overrides = await getStore('override:' + todayKey(), {});
+            delete overrides[activeOverrideBlockId];
+            await setStore('override:' + todayKey(), overrides);
+            const progress = await getStore('timetable:' + todayKey(), {});
+            sheetsCall('logOverride', { date: todayKey(), block: activeOverrideBlockId, plannedTitle: activeOverridePlannedTitle, actualTitle: '', completed: !!progress[activeOverrideBlockId] });
+            closeOverride();
+            renderTimetable();
         }
 
         /* ================= Reflection wizard ================= */
@@ -1162,6 +1392,8 @@
             document.getElementById('inputSheetsUrl').value = settings.sheetsUrl === DEFAULT_SHEETS_URL ? '' : (settings.sheetsUrl || '');
             document.getElementById('inputSheetsUrl').placeholder = DEFAULT_SHEETS_URL;
             document.getElementById('inputAlarmUrl').value = settings.alarmUrl || '';
+            const lastSynced = await getStore('schedule-last-synced', null);
+            document.getElementById('scheduleSyncedText').textContent = formatLastSynced(lastSynced);
             await updateSyncBadgeFromQueue();
             const overlay = document.getElementById('settingsOverlay');
             overlay.classList.remove('hidden'); overlay.classList.add('flex');
@@ -1178,6 +1410,8 @@
             initTabs();
             document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
+            await initSchedule();
+            await autoMergeFromSheets();
             await renderTimetable();
             await renderClientTasks();
             retryQueue();
@@ -1217,6 +1451,15 @@
             document.getElementById('settingsClose').addEventListener('click', closeSettings);
             document.getElementById('retrySyncBtn').addEventListener('click', retryQueue);
             document.getElementById('restoreBtn').addEventListener('click', restoreFromSheets);
+            document.getElementById('refreshScheduleBtn').addEventListener('click', async () => {
+                const fetched = await fetchAndCacheSchedule(true);
+                if (fetched && fetched.length) { SCHEDULE = fetched; await renderTimetable(); }
+                const lastSynced = await getStore('schedule-last-synced', null);
+                document.getElementById('scheduleSyncedText').textContent = formatLastSynced(lastSynced);
+            });
+            document.getElementById('overrideClose').addEventListener('click', closeOverride);
+            document.getElementById('saveOverrideBtn').addEventListener('click', saveOverride);
+            document.getElementById('clearOverrideBtn').addEventListener('click', clearOverride);
             document.getElementById('enableAlarmsBtn').addEventListener('click', async () => {
                 if ('Notification' in window) { try { await Notification.requestPermission(); } catch (e) { } }
                 try {
