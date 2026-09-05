@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#050505">
     <link rel="apple-touch-icon"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%23050505'/%3E%3Ctext x='50%25' y='60%25' font-size='90' font-family='Georgia' fill='%23f5f5f3' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
-    <title>Dini — Daily Hub</title>
+    <title>Amortree Flow</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,21 +40,36 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            overflow-x: hidden;
-            overflow-y: auto;             
-            -webkit-overflow-scrolling: touch; 
-            height: 100%; 
+            box-sizing: border-box;
+            overflow: hidden;
+            height: 100%;
         }
 
         body {
             font-family: 'Inter', sans-serif;
+            padding-top: env(safe-area-inset-top, 0px);
         }
 
         /* Guaranteed centering for the app shell, independent of whether the
            Tailwind CDN's runtime JIT has generated max-w-md/mx-auto yet — a
            plain CSS rule always applies, so the layout can never render
-           un-centered while those utility classes are still being compiled. */
+           un-centered while those utility classes are still being compiled.
+           height: 100% (not min-height/100vh) so this fills exactly the
+           space body has left after its safe-area padding, with its own
+           overflow hidden — <main> below is the only element that scrolls,
+           so the header and tab bar stay visually fixed in place. */
         .app-shell {
+            width: 100%;
+            max-width: 28rem;
+            margin-left: auto;
+            margin-right: auto;
+            height: 100%;
+            overflow: hidden;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .onboarding-shell {
             width: 100%;
             max-width: 28rem;
             margin-left: auto;
@@ -63,6 +78,15 @@
 
         .font-display {
             font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* The only scrolling element in the whole app shell — header and
+           tab bar are ordinary flex siblings above it with flex-shrink:0,
+           so they never scroll out of view; only this scrolls. */
+        main {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
         }
 
         .font-mono {
@@ -249,6 +273,189 @@
             border-color: rgba(255, 255, 255, 0.4);
         }
 
+        .override-task-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--glass-border);
+            text-align: left;
+            transition: all .2s ease;
+            width: 100%;
+        }
+
+        .override-task-row.active {
+            background: var(--glass-bg-strong);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .override-task-label {
+            font-size: 12.5px;
+            line-height: 1.3;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .override-task-hours {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--ink-dimmer);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .override-task-row.active .override-task-hours {
+            color: var(--ink);
+        }
+
+        /* ---- Desktop/tablet split layout (Timetable tab only) ----
+           Mobile stays exactly as it was: single column, calendar panel
+           hidden. At >=900px, #view-timetable becomes a two-pane grid —
+           left is the existing today's-blocks list unchanged, right is
+           the new inline month calendar + Reflections/Checkins history,
+           replacing the old modal-only Month Report for this tab. */
+        .desktop-cal-panel {
+            display: none;
+        }
+
+        @media (min-width: 900px) {
+            .app-shell {
+                max-width: 1440px;
+                padding-left: 32px;
+                padding-right: 32px;
+            }
+
+            #view-timetable {
+                display: grid;
+                grid-template-columns: minmax(280px, 30%) 1fr;
+                align-items: start;
+                gap: 32px;
+            }
+
+            .desktop-cal-panel {
+                display: block;
+            }
+        }
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .cal-weekday {
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9.5px;
+            color: var(--ink-dimmer);
+            padding-bottom: 4px;
+        }
+
+        .cal-day {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            cursor: pointer;
+            transition: all .15s ease;
+            position: relative;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .cal-day:hover {
+            background: var(--glass-bg);
+        }
+
+        .cal-day.is-today {
+            border-color: rgba(255, 255, 255, 0.45);
+        }
+
+        .cal-day.is-selected {
+            background: var(--glass-bg-strong);
+            border-color: #f5f5f3;
+        }
+
+        .cal-day.is-empty {
+            border: none;
+            cursor: default;
+            background: none;
+        }
+
+        .cal-day-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--ink-dim);
+        }
+
+        .cal-day-bar {
+            width: 60%;
+            height: 3px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .cal-day-bar-fill {
+            height: 100%;
+            background: #f5f5f3;
+        }
+
+        .cal-day-dot {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 5px;
+            height: 5px;
+            border-radius: 9999px;
+            background: #f5f5f3;
+            opacity: 0.7;
+        }
+
+        .history-card {
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background .15s ease;
+        }
+
+        .history-card:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .history-card-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: var(--glass-bg-strong);
+        }
+
+        .history-qa-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 5px 0;
+            border-top: 1px solid var(--glass-border);
+            font-size: 11.5px;
+        }
+
+        .history-qa-row:first-child {
+            border-top: none;
+        }
+
         .edit-block-btn {
             width: 28px;
             height: 28px;
@@ -362,11 +569,59 @@
 
 <body class="min-h-screen relative">
 
+    <!-- Onboarding — forced on first launch since there is no shared
+         backend anymore. Gated on settings.onboardingDone, not on
+         sheetsUrl presence, so choosing "skip" doesn't re-trigger this
+         on every launch. -->
+    <div id="onboardingOverlay" class="fixed inset-0 z-50 hidden flex-col" style="background:var(--bg)">
+        <div class="onboarding-shell w-full mx-auto h-full overflow-y-auto px-5 py-8 flex flex-col">
+            <h1 class="font-display text-2xl font-semibold mb-1">Set up your Google Sheet</h1>
+            <p class="text-xs mb-6" style="color:var(--ink-dim)">Your data syncs to a private Google Sheet that only
+                you control — nobody else can see it. Takes about 3 minutes, once.</p>
+
+            <div class="glass rounded-2xl p-4 mb-3">
+                <p class="text-[11px] uppercase tracking-wider font-mono mb-2" style="color:var(--ink-dimmer)">Step 1
+                </p>
+                <p class="text-sm">Create a new Google Sheet at <span class="font-mono">sheets.google.com</span>,
+                    then open <span class="font-mono">Extensions → Apps Script</span>.</p>
+            </div>
+            <div class="glass rounded-2xl p-4 mb-3">
+                <p class="text-[11px] uppercase tracking-wider font-mono mb-2" style="color:var(--ink-dimmer)">Step 2
+                </p>
+                <p class="text-sm mb-3">Delete the starter code, then paste in the backend script.</p>
+                <button id="copyBackendScriptBtn" class="w-full glass rounded-xl py-2.5 text-xs font-mono">Copy
+                    backend script</button>
+            </div>
+            <div class="glass rounded-2xl p-4 mb-3">
+                <p class="text-[11px] uppercase tracking-wider font-mono mb-2" style="color:var(--ink-dimmer)">Step 3
+                </p>
+                <p class="text-sm">Click <span class="font-mono">Deploy → New deployment → Web app</span>. Set
+                    <span class="font-mono">Execute as: Me</span> and <span class="font-mono">Who has access:
+                        Anyone</span>, then Deploy. Copy the URL it gives you.</p>
+            </div>
+            <div class="glass rounded-2xl p-4 mb-4">
+                <p class="text-[11px] uppercase tracking-wider font-mono mb-2" style="color:var(--ink-dimmer)">Step 4
+                </p>
+                <p class="text-sm mb-3">Paste that URL here:</p>
+                <input id="onboardingUrlInput" type="text" placeholder="https://script.google.com/macros/s/.../exec"
+                    class="w-full bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-xs font-mono placeholder:text-white/25">
+            </div>
+            <p id="onboardingError" class="hidden text-[11px] mb-3" style="color:var(--ink-dim)"></p>
+            <button id="onboardingTestBtn"
+                class="w-full bg-[#f5f5f3] text-black font-display font-semibold rounded-2xl py-3.5 text-sm active:scale-[0.98] transition-transform mb-3">Test
+                connection & continue</button>
+            <button id="onboardingSkipBtn" class="w-full glass rounded-2xl py-3 text-xs font-mono mb-2">Skip — use
+                this device only (no sync)</button>
+            <p class="text-[10px] text-center" style="color:var(--ink-dimmer)">You can always set this up later from
+                Settings.</p>
+        </div>
+    </div>
+
     <div class="blob-field" id="blobField"></div>
 
-    <div class="app-shell relative z-10 max-w-md mx-auto min-h-screen flex flex-col px-4 pt-6">
+    <div class="app-shell relative z-10 flex flex-col pt-6">
 
-        <header class="flex items-center justify-between mb-5">
+        <header class="flex items-center justify-between mb-5 shrink-0">
             <div>
                 <p class="text-[11px] tracking-[0.2em] uppercase font-mono" style="color:var(--ink-dimmer)"
                     id="dateLabel">—</p>
@@ -383,7 +638,7 @@
             </button>
         </header>
 
-        <div class="glass rounded-2xl p-1 flex relative mb-5">
+        <div class="glass rounded-2xl p-1 flex relative mb-5 shrink-0">
             <div id="tabIndicator"
                 class="absolute top-1 bottom-1 left-1 w-[calc(33.333%-4px)] rounded-xl glass-strong tab-underline">
             </div>
@@ -618,8 +873,8 @@
     <!-- Swap / Override Modal -->
     <div id="overrideOverlay"
         class="fixed inset-0 z-30 hidden items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4">
-        <div class="glass-strong rounded-3xl w-full max-w-sm p-6">
-            <div class="flex items-center justify-between mb-1">
+        <div class="glass-strong rounded-3xl w-full max-w-sm p-6 flex flex-col" style="max-height:85vh">
+            <div class="flex items-center justify-between mb-1 shrink-0">
                 <h2 class="font-display text-lg font-semibold">What did you actually do?</h2>
                 <button id="overrideClose"
                     class="w-8 h-8 rounded-full flex items-center justify-center glass shrink-0"><svg width="14"
@@ -627,10 +882,20 @@
                         <path d="M18 6L6 18M6 6l12 12" />
                     </svg></button>
             </div>
-            <p id="overridePlanned" class="text-xs mb-4" style="color:var(--ink-dimmer)">Planned: —</p>
-            <textarea id="overrideInput" rows="2" placeholder="What you actually worked on..."
-                class="w-full bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm resize-none placeholder:text-white/25"></textarea>
-            <div class="flex gap-3 mt-6">
+            <div class="overflow-y-auto" style="flex:1">
+                <p id="overridePlanned" class="text-xs mb-1" style="color:var(--ink-dimmer)">Planned: —</p>
+                <p id="overrideBlockDuration" class="text-[11px] font-mono mb-4" style="color:var(--ink-dimmer)"></p>
+
+                <p class="text-[11px] uppercase tracking-wider font-mono mb-2" style="color:var(--ink-dimmer)">Link a
+                    client task <span style="color:var(--ink-dimmer)">(optional)</span></p>
+                <p class="text-[11px] leading-relaxed mb-2.5" style="color:var(--ink-dimmer)">Tap a task to log this
+                    block's full duration against it. Tap again to unlink.</p>
+                <div id="overrideTaskList" class="flex flex-col gap-2 mb-4"></div>
+
+                <textarea id="overrideInput" rows="2" placeholder="What you actually worked on..."
+                    class="w-full bg-transparent border-b border-white/15 focus:border-white/50 outline-none py-2 text-sm resize-none placeholder:text-white/25"></textarea>
+            </div>
+            <div class="flex gap-3 mt-6 shrink-0">
                 <button id="clearOverrideBtn"
                     class="flex-1 glass rounded-2xl py-3 text-xs font-mono active:scale-95 transition-transform">Clear
                     swap</button>
@@ -681,8 +946,14 @@
     </div>
 
     <script>
-        /* ================= Default backend ================= */
-        const DEFAULT_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyY6drwQfPgeD8iFsOSZO2RAuo_VMg2I-EG1ktZEUCsJOb_WubckQi3I2NpK4PV4S0/exec";
+        /* ================= Backend =================
+           There is NO shared default Sheets URL. Each install must
+           configure its own Google Sheet (forced via the onboarding
+           gate below on first launch). A hardcoded shared URL here
+           previously meant every stranger who skipped setup would
+           silently write their data into the original developer's own
+           spreadsheet — removed entirely, not just hidden, so there's
+           no way to accidentally fall back to it. */
 
         /* ================= Storage helpers (local cache) =================
            window.storage only exists inside Claude.ai's own artifact preview
@@ -720,9 +991,66 @@
             catch (e) { console.error('storage set failed', e); }
         }
         async function getSettings() {
-            const settings = await getStore('settings', {});
-            if (!settings.sheetsUrl) settings.sheetsUrl = DEFAULT_SHEETS_URL;
-            return settings;
+            return await getStore('settings', {});
+        }
+
+        /* ================= Onboarding =================
+           Forced on first launch since there is no shared backend
+           anymore — gated on settings.onboardingDone (set either after
+           a successful connection test, or after an explicit skip), not
+           on sheetsUrl presence, so "skip" doesn't re-trigger this on
+           every future launch. The backend script is embedded here
+           (base64, to sidestep any quoting issues) purely so a Play
+           Store install has no separate file to hunt down — one button
+           copies it straight to the clipboard for pasting into Apps
+           Script. */
+        const BACKEND_SCRIPT_B64 = "LyoqCiAqIERpbmkg4oCUIEdvb2dsZSBTaGVldHMgYmFja2VuZAogKiAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KICogRGVwbG95IHRoaXMgYXMgYSBXZWIgQXBwIChFeHRlbnNpb25zID4gQXBwcyBTY3JpcHQsIGluIGEgR29vZ2xlIFNoZWV0KToKICogICAxLiBEZXBsb3kgPiBOZXcgZGVwbG95bWVudCA+IHR5cGUgIldlYiBhcHAiCiAqICAgMi4gRXhlY3V0ZSBhczogTWUKICogICAzLiBXaG8gaGFzIGFjY2VzczogQW55b25lCiAqICAgNC4gQ29weSB0aGUgL2V4ZWMgVVJMIGl0IGdpdmVzIHlvdSBhbmQgcGFzdGUgaXQgaW50bwogKiAgICAgIERpbmkncyBTZXR0aW5ncyA+IEdvb2dsZSBTaGVldHMgZmllbGQuCiAqCiAqIE9uIGZpcnN0IGNhbGwgdGhpcyBjcmVhdGVzIHRhYnMgYXV0b21hdGljYWxseToKICogICBUYXNrcywgVGltZXRhYmxlLCBQcm9maWxlLCBSZWZsZWN0aW9ucywgU2NoZWR1bGUsIFRpbWV0YWJsZUxvZywgQ2hlY2tpbnMKICoKICogUmVzcG9uZHMgdG8gSlNPTlAgKGEgPHNjcmlwdD4gdGFnIEdFVCB3aXRoIGEgP2NhbGxiYWNrPSBwYXJhbSkKICogYmVjYXVzZSBBcHBzIFNjcmlwdCBXZWIgQXBwcyBjYW4ndCBiZSByZWFjaGVkIHdpdGggZmV0Y2goKS9DT1JTCiAqIGZyb20gYSBwYWdlIGhvc3RlZCBlbHNld2hlcmUuCiAqCiAqIEVESVQgWU9VUiBEQVk6IGNoYW5nZSB0aGUgIlNjaGVkdWxlIiB0YWIgZGlyZWN0bHkgdG8gY2hhbmdlIHRoZQogKiB0aW1ldGFibGUg4oCUIG5vIHJlZGVwbG95IG5lZWRlZC4gQ29sdW1uczoKICogICBvcmRlciAgICAgIOKAlCBudW1iZXIgY29udHJvbGxpbmcgZGlzcGxheS9ncm91cCBvcmRlcgogKiAgIGlkICAgICAgICAg4oCUIHNob3J0IHN0YWJsZSBzbHVnIChlLmcuICJ5b2dhIikuIFJlbmFtZSB0aXRsZXMvdGltZXMKICogICAgICAgICAgICAgICAgZnJlZWx5LCBidXQga2VlcCBhbiBpZCBzdGFibGUgb25jZSB5b3UndmUgbG9nZ2VkCiAqICAgICAgICAgICAgICAgIGhpc3RvcnkgYWdhaW5zdCBpdCwgb3IgdGhhdCBoaXN0b3J5IHN0b3BzIGxpbmluZyB1cC4KICogICBzdGFydFRpbWUgLyBlbmRUaW1lIOKAlCAyNC1ob3VyICJIOk1NIiBvciAiSEg6TU0iLCBlLmcuICI1OjAwIiwgIjE4OjE1IgogKiAgIHRpdGxlICAgICAg4oCUIHdoYXQgc2hvd3Mgb24gdGhlIGNhcmQKICogICBncm91cCAgICAgIOKAlCBzZWN0aW9uIGhlYWRpbmcgdGhlIGJsb2NrIGlzIHNob3duIHVuZGVyCiAqIFRoZSB0YWIgaXMgc2VlZGVkIHdpdGggdGhlIGN1cnJlbnQgZGVmYXVsdCBkYXkgdGhlIGZpcnN0IHRpbWUgdGhpcwogKiBzY3JpcHQgcnVuczsgYWZ0ZXIgdGhhdCwgdGhlIHNoZWV0IGlzIHRoZSBzb3VyY2Ugb2YgdHJ1dGguCiAqCiAqIElNUE9SVEFOVDogYWZ0ZXIgcGFzdGluZyB0aGlzIHVwZGF0ZSBpbnRvIHRoZSBBcHBzIFNjcmlwdCBlZGl0b3IsCiAqIHlvdSBNVVNUIHJlZGVwbG95IChEZXBsb3kgPiBNYW5hZ2UgZGVwbG95bWVudHMgPiBFZGl0ID4gVmVyc2lvbjogTmV3CiAqID4gRGVwbG95KSBmb3IgdGhlIG5ldyBzYXZlQ2hlY2tpbiBhY3Rpb24gdG8gZ28gbGl2ZS4gU2F2aW5nIHRoZQogKiBzY3JpcHQgYWxvbmUgZG9lcyBub3QgdXBkYXRlIHRoZSBydW5uaW5nIC9leGVjIGVuZHBvaW50LgogKi8KCmNvbnN0IFNIRUVUX1RBU0tTID0gJ1Rhc2tzJzsKY29uc3QgU0hFRVRfVElNRVRBQkxFID0gJ1RpbWV0YWJsZSc7CmNvbnN0IFNIRUVUX1BST0ZJTEUgPSAnUHJvZmlsZSc7CmNvbnN0IFNIRUVUX1JFRkxFQ1RJT05TID0gJ1JlZmxlY3Rpb25zJzsKY29uc3QgU0hFRVRfU0NIRURVTEUgPSAnU2NoZWR1bGUnOwpjb25zdCBTSEVFVF9USU1FVEFCTEVfTE9HID0gJ1RpbWV0YWJsZUxvZyc7CmNvbnN0IFNIRUVUX0NIRUNLSU5TID0gJ0NoZWNraW5zJzsKCmZ1bmN0aW9uIGRvR2V0KGUpIHsKICBjb25zdCBjYWxsYmFjayA9IGUucGFyYW1ldGVyLmNhbGxiYWNrOwogIGNvbnN0IGFjdGlvbiA9IGUucGFyYW1ldGVyLmFjdGlvbjsKICBsZXQgcGF5bG9hZCA9IHt9OwogIHRyeSB7IHBheWxvYWQgPSBKU09OLnBhcnNlKGUucGFyYW1ldGVyLnBheWxvYWQgfHwgJ3t9Jyk7IH0gY2F0Y2ggKGVycikgeyBwYXlsb2FkID0ge307IH0KCiAgbGV0IHJlc3VsdDsKICB0cnkgewogICAgc3dpdGNoIChhY3Rpb24pIHsKICAgICAgY2FzZSAnZ2V0QWxsJzogcmVzdWx0ID0gaGFuZGxlR2V0QWxsKCk7IGJyZWFrOwogICAgICBjYXNlICdnZXRTY2hlZHVsZSc6IHJlc3VsdCA9IGhhbmRsZUdldFNjaGVkdWxlKCk7IGJyZWFrOwogICAgICBjYXNlICd1cHNlcnRUYXNrJzogcmVzdWx0ID0gaGFuZGxlVXBzZXJ0VGFzayhwYXlsb2FkKTsgYnJlYWs7CiAgICAgIGNhc2UgJ2RlbGV0ZVRhc2snOiByZXN1bHQgPSBoYW5kbGVEZWxldGVUYXNrKHBheWxvYWQpOyBicmVhazsKICAgICAgY2FzZSAndG9nZ2xlQmxvY2snOiByZXN1bHQgPSBoYW5kbGVUb2dnbGVCbG9jayhwYXlsb2FkKTsgYnJlYWs7CiAgICAgIGNhc2UgJ2xvZ092ZXJyaWRlJzogcmVzdWx0ID0gaGFuZGxlTG9nT3ZlcnJpZGUocGF5bG9hZCk7IGJyZWFrOwogICAgICBjYXNlICdzYXZlUmVmbGVjdGlvbic6IHJlc3VsdCA9IGhhbmRsZVNhdmVSZWZsZWN0aW9uKHBheWxvYWQpOyBicmVhazsKICAgICAgY2FzZSAnc2F2ZVByb2ZpbGUnOiByZXN1bHQgPSBoYW5kbGVTYXZlUHJvZmlsZShwYXlsb2FkKTsgYnJlYWs7CiAgICAgIGNhc2UgJ3NhdmVDaGVja2luJzogcmVzdWx0ID0gaGFuZGxlU2F2ZUNoZWNraW4ocGF5bG9hZCk7IGJyZWFrOwogICAgICBkZWZhdWx0OiByZXN1bHQgPSB7IHN0YXR1czogJ2Vycm9yJywgbWVzc2FnZTogJ1Vua25vd24gYWN0aW9uOiAnICsgYWN0aW9uIH07CiAgICB9CiAgfSBjYXRjaCAoZXJyKSB7CiAgICByZXN1bHQgPSB7IHN0YXR1czogJ2Vycm9yJywgbWVzc2FnZTogU3RyaW5nKGVycikgfTsKICB9CgogIGNvbnN0IGJvZHkgPSBjYWxsYmFjawogICAgPyBjYWxsYmFjayArICcoJyArIEpTT04uc3RyaW5naWZ5KHJlc3VsdCkgKyAnKScKICAgIDogSlNPTi5zdHJpbmdpZnkocmVzdWx0KTsKICBjb25zdCBtaW1lID0gY2FsbGJhY2sKICAgID8gQ29udGVudFNlcnZpY2UuTWltZVR5cGUuSkFWQVNDUklQVAogICAgOiBDb250ZW50U2VydmljZS5NaW1lVHlwZS5KU09OOwogIHJldHVybiBDb250ZW50U2VydmljZS5jcmVhdGVUZXh0T3V0cHV0KGJvZHkpLnNldE1pbWVUeXBlKG1pbWUpOwp9CgovKiAtLS0tLS0tLS0tLS0tLS0tIFNoZWV0IGhlbHBlcnMgLS0tLS0tLS0tLS0tLS0tLSAqLwpmdW5jdGlvbiBnZXRTUygpIHsgcmV0dXJuIFNwcmVhZHNoZWV0QXBwLmdldEFjdGl2ZVNwcmVhZHNoZWV0KCk7IH0KCmZ1bmN0aW9uIGdldE9yQ3JlYXRlU2hlZXQobmFtZSwgaGVhZGVycykgewogIGNvbnN0IHNzID0gZ2V0U1MoKTsKICBsZXQgc2hlZXQgPSBzcy5nZXRTaGVldEJ5TmFtZShuYW1lKTsKICBpZiAoIXNoZWV0KSB7CiAgICBzaGVldCA9IHNzLmluc2VydFNoZWV0KG5hbWUpOwogICAgc2hlZXQuYXBwZW5kUm93KGhlYWRlcnMpOwogICAgc2hlZXQuc2V0RnJvemVuUm93cygxKTsKICB9CiAgcmV0dXJuIHNoZWV0Owp9CgovKioKICogUmVmb3JtYXRzIGEgc2luZ2xlIGNlbGwgdmFsdWUgZm9yIEpTT04gb3V0cHV0LiBTaGVldHMgc2lsZW50bHkKICogY29udmVydHMgc3RyaW5ncyB0eXBlZCBpbnRvIFRpbWUvRGF0ZS10eXBlZCBjZWxscyAob3IgYXV0by1kZXRlY3RlZAogKiBhcyBzdWNoKSBpbnRvIGl0cyBvd24gaW50ZXJuYWwgZGF0ZSB2YWx1ZSwgYW5jaG9yZWQgdG8gaXRzIGVwb2NoCiAqIGRhdGUgKERlYyAzMCwgMTg5OSkgZm9yIHRpbWUtb25seSB2YWx1ZXMuIEFwcHMgU2NyaXB0IHJlYWRzIHRoYXQKICogYmFjayBhcyBhIGZ1bGwgSlMgRGF0ZSwgYW5kIEpTT04uc3RyaW5naWZ5KCkgYWx3YXlzIHJlbmRlcnMgRGF0ZQogKiBvYmplY3RzIGluIFVUQyDigJQgd2hpY2ggaXMgd2hhdCBjYXVzZWQgJzQ6MDAnIElTVCB0byBjb21lIG91dCBhcwogKiAnLi4uVDIyOjMwOjAwLjAwMFonIHRoZSBkYXkgYmVmb3JlLgogKgogKiBGaXg6IG5ldmVyIGxldCBhIHJhdyBEYXRlIHJlYWNoIEpTT04uc3RyaW5naWZ5LiBSZWZvcm1hdCBpdCBiYWNrIHRvCiAqIGEgcGxhaW4gc3RyaW5nLCBpbiB0aGUgc3ByZWFkc2hlZXQncyBvd24gdGltZXpvbmUsIHNoYXBlZCB0byB3aGF0CiAqIHRoZSBjb2x1bW4gYWN0dWFsbHkgcmVwcmVzZW50cyAodGltZS1vZi1kYXkgdnMgY2FsZW5kYXIgZGF0ZSB2cwogKiByZWFsIHRpbWVzdGFtcCkuCiAqLwpmdW5jdGlvbiBmb3JtYXRDZWxsVmFsdWUodmFsdWUsIGhlYWRlciwgdHopIHsKICBpZiAoISh2YWx1ZSBpbnN0YW5jZW9mIERhdGUpKSByZXR1cm4gdmFsdWU7CiAgaWYgKGhlYWRlciA9PT0gJ3N0YXJ0VGltZScgfHwgaGVhZGVyID09PSAnZW5kVGltZScpIHsKICAgIHJldHVybiBVdGlsaXRpZXMuZm9ybWF0RGF0ZSh2YWx1ZSwgdHosICdISDptbScpOwogIH0KICBpZiAoaGVhZGVyID09PSAnc3RhcnREYXRlJyB8fCBoZWFkZXIgPT09ICdlbmREYXRlJyB8fCBoZWFkZXIgPT09ICdkYXRlJykgewogICAgcmV0dXJuIFV0aWxpdGllcy5mb3JtYXREYXRlKHZhbHVlLCB0eiwgJ3l5eXktTU0tZGQnKTsKICB9CiAgLy8gRmFsbGJhY2sgZm9yIGFueSBvdGhlciBEYXRlLXR5cGVkIGNvbHVtbiAoZS5nLiB1cGRhdGVkQXQvdGltZXN0YW1wCiAgLy8gY2VsbHMgdGhhdCBnb3QgYXV0by1jb252ZXJ0ZWQpIOKAlCBzdGlsbCBhIHJlYWwgdGltZXN0YW1wLCBqdXN0CiAgLy8gcmVuZGVyZWQgaW4gbG9jYWwgdGltZSBpbnN0ZWFkIG9mIHNpbGVudGx5LXNoaWZ0ZWQgVVRDLgogIHJldHVybiBVdGlsaXRpZXMuZm9ybWF0RGF0ZSh2YWx1ZSwgdHosICJ5eXl5LU1NLWRkJ1QnSEg6bW06c3MuU1NTJ1onIik7Cn0KCmZ1bmN0aW9uIHNoZWV0VG9PYmplY3RzKHNoZWV0KSB7CiAgY29uc3QgdmFsdWVzID0gc2hlZXQuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCk7CiAgaWYgKHZhbHVlcy5sZW5ndGggPCAyKSByZXR1cm4gW107CiAgY29uc3QgaGVhZGVycyA9IHZhbHVlc1swXTsKICBjb25zdCB0eiA9IGdldFNTKCkuZ2V0U3ByZWFkc2hlZXRUaW1lWm9uZSgpOwogIHJldHVybiB2YWx1ZXMuc2xpY2UoMSkKICAgIC5maWx0ZXIocm93ID0+IHJvdy5zb21lKGNlbGwgPT4gY2VsbCAhPT0gJycgJiYgY2VsbCAhPT0gbnVsbCkpCiAgICAubWFwKHJvdyA9PiB7CiAgICAgIGNvbnN0IG9iaiA9IHt9OwogICAgICBoZWFkZXJzLmZvckVhY2goKGgsIGkpID0+IHsgb2JqW2hdID0gZm9ybWF0Q2VsbFZhbHVlKHJvd1tpXSwgaCwgdHopOyB9KTsKICAgICAgcmV0dXJuIG9iajsKICAgIH0pOwp9CgpmdW5jdGlvbiBmaW5kUm93SW5kZXhCeUlkKHNoZWV0LCBpZENvbE5hbWUsIGlkKSB7CiAgY29uc3QgdmFsdWVzID0gc2hlZXQuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCk7CiAgY29uc3QgaGVhZGVycyA9IHZhbHVlc1swXTsKICBjb25zdCBpZENvbCA9IGhlYWRlcnMuaW5kZXhPZihpZENvbE5hbWUpOwogIGZvciAobGV0IHIgPSAxOyByIDwgdmFsdWVzLmxlbmd0aDsgcisrKSB7CiAgICBpZiAoU3RyaW5nKHZhbHVlc1tyXVtpZENvbF0pID09PSBTdHJpbmcoaWQpKSByZXR1cm4gciArIDE7IC8vIDEtaW5kZXhlZCBzaGVldCByb3cKICB9CiAgcmV0dXJuIC0xOwp9CgovKioKICogTGlrZSBmaW5kUm93SW5kZXhCeUlkIGJ1dCBtYXRjaGVzIG9uIHR3byBjb2x1bW5zIGF0IG9uY2Ug4oCUIHVzZWQgZm9yCiAqIFRpbWV0YWJsZS9UaW1ldGFibGVMb2cgcm93cyB3aGljaCBhcmUga2V5ZWQgYnkgKGRhdGUsIGJsb2NrKSByYXRoZXIKICogdGhhbiBhIHNpbmdsZSBpZC4gVmFsdWVzIGFyZSBub3JtYWxpemVkIHRocm91Z2ggdGhlIHNhbWUKICogZm9ybWF0Q2VsbFZhbHVlKCkgcGF0aCB1c2VkIGZvciBvdXRwdXQsIHNvIGEgJ2RhdGUnIGNlbGwgdGhhdCBnb3QKICogYXV0by1jb252ZXJ0ZWQgdG8gYSBEYXRlIHR5cGUgYnkgU2hlZXRzIHN0aWxsIGNvbXBhcmVzIGVxdWFsIHRvIHRoZQogKiBwbGFpbiAiWVlZWS1NTS1ERCIgc3RyaW5nIHRoZSBjbGllbnQgc2VuZHMg4oCUIG90aGVyd2lzZSBhIHN0cmljdAogKiA9PT0gYWdhaW5zdCBhIHJhdyBEYXRlIHNpbGVudGx5IGZhaWxzIHRvIG1hdGNoIGFuZCBhcHBlbmRzIGEKICogZHVwbGljYXRlIHJvdyBpbnN0ZWFkIG9mIHVwZGF0aW5nIHRoZSBleGlzdGluZyBvbmUuCiAqLwpmdW5jdGlvbiBmaW5kUm93SW5kZXhCeVR3b0NvbHMoc2hlZXQsIGNvbE5hbWVBLCB2YWx1ZUEsIGNvbE5hbWVCLCB2YWx1ZUIpIHsKICBjb25zdCB2YWx1ZXMgPSBzaGVldC5nZXREYXRhUmFuZ2UoKS5nZXRWYWx1ZXMoKTsKICBjb25zdCBoZWFkZXJzID0gdmFsdWVzWzBdOwogIGNvbnN0IGNvbEEgPSBoZWFkZXJzLmluZGV4T2YoY29sTmFtZUEpOwogIGNvbnN0IGNvbEIgPSBoZWFkZXJzLmluZGV4T2YoY29sTmFtZUIpOwogIGNvbnN0IHR6ID0gZ2V0U1MoKS5nZXRTcHJlYWRzaGVldFRpbWVab25lKCk7CiAgZm9yIChsZXQgciA9IDE7IHIgPCB2YWx1ZXMubGVuZ3RoOyByKyspIHsKICAgIGNvbnN0IGNlbGxBID0gZm9ybWF0Q2VsbFZhbHVlKHZhbHVlc1tyXVtjb2xBXSwgY29sTmFtZUEsIHR6KTsKICAgIGNvbnN0IGNlbGxCID0gZm9ybWF0Q2VsbFZhbHVlKHZhbHVlc1tyXVtjb2xCXSwgY29sTmFtZUIsIHR6KTsKICAgIGlmIChjZWxsQSA9PT0gdmFsdWVBICYmIGNlbGxCID09PSB2YWx1ZUIpIHJldHVybiByICsgMTsKICB9CiAgcmV0dXJuIC0xOwp9CgovKiAtLS0tLS0tLS0tLS0tLS0tIFNjaGVkdWxlIHNlZWQgKGZpcnN0LXJ1biBkZWZhdWx0IGRheSkgLS0tLS0tLS0tLS0tLS0tLSAqLwpjb25zdCBTQ0hFRFVMRV9TRUVEID0gWwogIFsxLCAnbWVkaXRhdGlvbicsICc0OjAwJywgJzU6MDAnLCAnTWVkaXRhdGlvbiwgc3R1ZHksIHBsYW4gdGhlIGRheScsICdNb3JuaW5nJ10sCiAgWzIsICd5b2dhJywgJzU6MDAnLCAnNjowMCcsICdZb2dhIC8gRXhlcmNpc2UnLCAnTW9ybmluZyddLAogIFszLCAnYmF0aCcsICc2OjAwJywgJzc6MDAnLCAnQmF0aCwgZ2V0IHJlYWR5JywgJ01vcm5pbmcnXSwKICBbNCwgJ2JyZWFrZmFzdCcsICc3OjAwJywgJzk6MTUnLCAnQnJlYWtmYXN0LCBmYW1pbHkgdGltZSwgZ2V0IGRhdWdodGVyIHJlYWR5JywgJ01vcm5pbmcnXSwKICBbNSwgJ2Ryb3BvZmYnLCAnOToxNScsICc5OjQ1JywgJ1NjaG9vbCBkcm9wLW9mZiArIGJhY2sgaG9tZScsICdNb3JuaW5nJ10sCiAgWzYsICdjcmVhdGl2ZScsICc5OjQ1JywgJzEwOjE1JywgJ0NyZWF0aXZlICYgc29jaWFsIHBvc3QgZm9yIEFtb3J0cmVlJywgJ01hcmtldGluZyAmIE91dHJlYWNoJ10sCiAgWzcsICdvdXRyZWFjaCcsICcxMDoxNScsICcxMToxNScsICdPdXRyZWFjaCDigJQgMTArIG1lc3NhZ2VzIC8gZW1haWxzJywgJ01hcmtldGluZyAmIE91dHJlYWNoJ10sCiAgWzgsICdjbGllbnR3b3JrMScsICcxMToxNScsICcxMzowMCcsICdDbGllbnQgd29yayAoaWYgYW55KScsICdNYXJrZXRpbmcgJiBPdXRyZWFjaCddLAogIFs5LCAnbHVuY2gnLCAnMTM6MDAnLCAnMTQ6MDAnLCAnTHVuY2gnLCAnQnJlYWsnXSwKICBbMTAsICdkcm9wc2hpcCcsICcxNDowMCcsICcxNTowMCcsICdEcm9wc2hpcHBpbmcgc2V0dXAgLyBtYW5hZ2VtZW50JywgJ0RlZXAgV29yayddLAogIFsxMSwgJ2NvcmV3b3JrJywgJzE1OjAwJywgJzE4OjAwJywgJ0NvcmUgd29yayDigJQgTWljcm9yZWxpYyAvIEFtb3J0cmVlJywgJ0RlZXAgV29yayddLAogIFsxMiwgJ2JyZWFrMicsICcxODowMCcsICcxODoxNScsICdCcmVhayAvIHRlYScsICdMZWFybmluZyddLAogIFsxMywgJ2xlYXJuaW5nJywgJzE4OjE1JywgJzE5OjE1JywgJ1NlbGYtYnJhbmRpbmcgdHJhaW5pbmcgLyBuOG4gYXV0b21hdGlvbicsICdMZWFybmluZyddLAogIFsxNCwgJ2ZhbWlseScsICcxOToxNScsICcyMTowMCcsICdGYW1pbHkgdGltZSArIGRpbm5lcicsICdFdmVuaW5nJ10sCiAgWzE1LCAncGxhbmRheScsICcyMTowMCcsICcyMTozMCcsICJQbGFuIHRvbW9ycm93J3MgdG9wIDMgdGFza3MiLCAnRXZlbmluZyddLAogIFsxNiwgJ3dpbmRkb3duJywgJzIxOjMwJywgJzIzOjAwJywgJ1dpbmQgZG93biwgc2xlZXAgcHJlcCcsICdFdmVuaW5nJ10KXTsKCmZ1bmN0aW9uIGdldE9yU2VlZFNjaGVkdWxlU2hlZXQoKSB7CiAgY29uc3Qgc3MgPSBnZXRTUygpOwogIGNvbnN0IGV4aXN0ZWQgPSAhIXNzLmdldFNoZWV0QnlOYW1lKFNIRUVUX1NDSEVEVUxFKTsKICBjb25zdCBzaGVldCA9IGdldE9yQ3JlYXRlU2hlZXQoU0hFRVRfU0NIRURVTEUsIFsnb3JkZXInLCAnaWQnLCAnc3RhcnRUaW1lJywgJ2VuZFRpbWUnLCAndGl0bGUnLCAnZ3JvdXAnXSk7CiAgaWYgKCFleGlzdGVkKSB7CiAgICBTQ0hFRFVMRV9TRUVELmZvckVhY2gocm93ID0+IHNoZWV0LmFwcGVuZFJvdyhyb3cpKTsKICB9CiAgcmV0dXJuIHNoZWV0Owp9CgovKiAtLS0tLS0tLS0tLS0tLS0tIEhhbmRsZXJzIC0tLS0tLS0tLS0tLS0tLS0gKi8KZnVuY3Rpb24gaGFuZGxlR2V0QWxsKCkgewogIGNvbnN0IHRhc2tzU2hlZXQgPSBnZXRPckNyZWF0ZVNoZWV0KFNIRUVUX1RBU0tTLAogICAgWydpZCcsICdjbGllbnRJZCcsICdkZXNjcmlwdGlvbicsICdzdGFydERhdGUnLCAnZW5kRGF0ZScsICdzdGF0dXMnLCAndG90YWxNaW51dGVzJywgJ3VwZGF0ZWRBdCddKTsKICBjb25zdCB0aW1ldGFibGVTaGVldCA9IGdldE9yQ3JlYXRlU2hlZXQoU0hFRVRfVElNRVRBQkxFLAogICAgWydkYXRlJywgJ2Jsb2NrJywgJ2NvbXBsZXRlZCcsICd1cGRhdGVkQXQnXSk7CiAgY29uc3QgcHJvZmlsZVNoZWV0ID0gZ2V0T3JDcmVhdGVTaGVldChTSEVFVF9QUk9GSUxFLCBbJ25hbWUnLCAndXBkYXRlZEF0J10pOwogIGNvbnN0IHNjaGVkdWxlU2hlZXQgPSBnZXRPclNlZWRTY2hlZHVsZVNoZWV0KCk7CgogIGNvbnN0IGNsaWVudFRhc2tzID0gc2hlZXRUb09iamVjdHModGFza3NTaGVldCk7CiAgY29uc3QgdGltZXRhYmxlID0gc2hlZXRUb09iamVjdHModGltZXRhYmxlU2hlZXQpOwogIGNvbnN0IHByb2ZpbGVSb3dzID0gc2hlZXRUb09iamVjdHMocHJvZmlsZVNoZWV0KTsKICBjb25zdCBwcm9maWxlID0gcHJvZmlsZVJvd3MubGVuZ3RoID8gcHJvZmlsZVJvd3NbcHJvZmlsZVJvd3MubGVuZ3RoIC0gMV0gOiB7IG5hbWU6ICdEaW5pJyB9OwogIGNvbnN0IHNjaGVkdWxlID0gc2hlZXRUb09iamVjdHMoc2NoZWR1bGVTaGVldCk7CgogIHJldHVybiB7IHN0YXR1czogJ29rJywgY2xpZW50VGFza3MsIHRpbWV0YWJsZSwgcHJvZmlsZSwgc2NoZWR1bGUgfTsKfQoKZnVuY3Rpb24gaGFuZGxlR2V0U2NoZWR1bGUoKSB7CiAgY29uc3Qgc2NoZWR1bGVTaGVldCA9IGdldE9yU2VlZFNjaGVkdWxlU2hlZXQoKTsKICByZXR1cm4geyBzdGF0dXM6ICdvaycsIHNjaGVkdWxlOiBzaGVldFRvT2JqZWN0cyhzY2hlZHVsZVNoZWV0KSB9Owp9CgpmdW5jdGlvbiBoYW5kbGVVcHNlcnRUYXNrKHApIHsKICBjb25zdCBzaGVldCA9IGdldE9yQ3JlYXRlU2hlZXQoU0hFRVRfVEFTS1MsCiAgICBbJ2lkJywgJ2NsaWVudElkJywgJ2Rlc2NyaXB0aW9uJywgJ3N0YXJ0RGF0ZScsICdlbmREYXRlJywgJ3N0YXR1cycsICd0b3RhbE1pbnV0ZXMnLCAndXBkYXRlZEF0J10pOwogIGNvbnN0IG5vdyA9IG5ldyBEYXRlKCkudG9JU09TdHJpbmcoKTsKICBjb25zdCByb3cgPSBbcC5pZCwgcC5jbGllbnRJZCwgcC5kZXNjcmlwdGlvbiwgcC5zdGFydERhdGUsIHAuZW5kRGF0ZSwgcC5zdGF0dXMsIHAudG90YWxNaW51dGVzIHx8IDAsIG5vd107CiAgY29uc3QgZXhpc3RpbmdSb3cgPSBmaW5kUm93SW5kZXhCeUlkKHNoZWV0LCAnaWQnLCBwLmlkKTsKICBpZiAoZXhpc3RpbmdSb3cgPiAwKSB7CiAgICBzaGVldC5nZXRSYW5nZShleGlzdGluZ1JvdywgMSwgMSwgcm93Lmxlbmd0aCkuc2V0VmFsdWVzKFtyb3ddKTsKICB9IGVsc2UgewogICAgc2hlZXQuYXBwZW5kUm93KHJvdyk7CiAgfQogIHJldHVybiB7IHN0YXR1czogJ29rJyB9Owp9CgpmdW5jdGlvbiBoYW5kbGVEZWxldGVUYXNrKHApIHsKICBjb25zdCBzaGVldCA9IGdldE9yQ3JlYXRlU2hlZXQoU0hFRVRfVEFTS1MsCiAgICBbJ2lkJywgJ2NsaWVudElkJywgJ2Rlc2NyaXB0aW9uJywgJ3N0YXJ0RGF0ZScsICdlbmREYXRlJywgJ3N0YXR1cycsICd0b3RhbE1pbnV0ZXMnLCAndXBkYXRlZEF0J10pOwogIGNvbnN0IGV4aXN0aW5nUm93ID0gZmluZFJvd0luZGV4QnlJZChzaGVldCwgJ2lkJywgcC5pZCk7CiAgaWYgKGV4aXN0aW5nUm93ID4gMCkgc2hlZXQuZGVsZXRlUm93KGV4aXN0aW5nUm93KTsKICByZXR1cm4geyBzdGF0dXM6ICdvaycgfTsKfQoKZnVuY3Rpb24gaGFuZGxlVG9nZ2xlQmxvY2socCkgewogIGNvbnN0IHNoZWV0ID0gZ2V0T3JDcmVhdGVTaGVldChTSEVFVF9USU1FVEFCTEUsIFsnZGF0ZScsICdibG9jaycsICdjb21wbGV0ZWQnLCAndXBkYXRlZEF0J10pOwogIGNvbnN0IGZvdW5kUm93ID0gZmluZFJvd0luZGV4QnlUd29Db2xzKHNoZWV0LCAnZGF0ZScsIHAuZGF0ZSwgJ2Jsb2NrJywgcC5ibG9jayk7CiAgY29uc3Qgbm93ID0gbmV3IERhdGUoKS50b0lTT1N0cmluZygpOwogIGNvbnN0IHJvdyA9IFtwLmRhdGUsIHAuYmxvY2ssIHAuY29tcGxldGVkLCBub3ddOwogIGlmIChmb3VuZFJvdyA+IDApIHsKICAgIHNoZWV0LmdldFJhbmdlKGZvdW5kUm93LCAxLCAxLCByb3cubGVuZ3RoKS5zZXRWYWx1ZXMoW3Jvd10pOwogIH0gZWxzZSB7CiAgICBzaGVldC5hcHBlbmRSb3cocm93KTsKICB9CiAgcmV0dXJuIHsgc3RhdHVzOiAnb2snIH07Cn0KCi8qKgogKiBMb2dzIGEgInN3YXAiIOKAlCB3aGF0IHdhcyBhY3R1YWxseSBkb25lIGluc3RlYWQgb2YgdGhlIHBsYW5uZWQgYmxvY2sg4oCUCiAqIGtleWVkIGJ5IChkYXRlLCBibG9jayksIHNhbWUgdXBzZXJ0LWJ5LXR3by1jb2x1bW5zIHBhdHRlcm4gYXMKICogaGFuZGxlVG9nZ2xlQmxvY2suIEFuIGVtcHR5IGFjdHVhbFRpdGxlIG1lYW5zIHRoZSBzd2FwIHdhcyBjbGVhcmVkLgogKi8KZnVuY3Rpb24gaGFuZGxlTG9nT3ZlcnJpZGUocCkgewogIGNvbnN0IHNoZWV0ID0gZ2V0T3JDcmVhdGVTaGVldChTSEVFVF9USU1FVEFCTEVfTE9HLAogICAgWydkYXRlJywgJ2Jsb2NrJywgJ3BsYW5uZWRUaXRsZScsICdhY3R1YWxUaXRsZScsICdjb21wbGV0ZWQnLCAndXBkYXRlZEF0J10pOwogIGNvbnN0IG5vdyA9IG5ldyBEYXRlKCkudG9JU09TdHJpbmcoKTsKICBjb25zdCByb3cgPSBbcC5kYXRlLCBwLmJsb2NrLCBwLnBsYW5uZWRUaXRsZSB8fCAnJywgcC5hY3R1YWxUaXRsZSB8fCAnJywgISFwLmNvbXBsZXRlZCwgbm93XTsKICBjb25zdCBmb3VuZFJvdyA9IGZpbmRSb3dJbmRleEJ5VHdvQ29scyhzaGVldCwgJ2RhdGUnLCBwLmRhdGUsICdibG9jaycsIHAuYmxvY2spOwogIGlmIChmb3VuZFJvdyA+IDApIHsKICAgIHNoZWV0LmdldFJhbmdlKGZvdW5kUm93LCAxLCAxLCByb3cubGVuZ3RoKS5zZXRWYWx1ZXMoW3Jvd10pOwogIH0gZWxzZSB7CiAgICBzaGVldC5hcHBlbmRSb3cocm93KTsKICB9CiAgcmV0dXJuIHsgc3RhdHVzOiAnb2snIH07Cn0KCmZ1bmN0aW9uIGhhbmRsZVNhdmVSZWZsZWN0aW9uKHApIHsKICBjb25zdCBzaGVldCA9IGdldE9yQ3JlYXRlU2hlZXQoU0hFRVRfUkVGTEVDVElPTlMsCiAgICBbJ3Rhc2tJZCcsICdjbGllbnRJZCcsICdkZXNjcmlwdGlvbicsICdxdWFsaXR5JywgJ2RlbGl2ZXJlZCcsICdibG9ja2VycycsICdmb2xsb3dVcCcsICdjb25maWRlbmNlJywgJ25vdGVzJywgJ3RpbWVzdGFtcCddKTsKICBzaGVldC5hcHBlbmRSb3coWwogICAgcC50YXNrSWQsIHAuY2xpZW50SWQsIHAuZGVzY3JpcHRpb24sIHAucXVhbGl0eSwgcC5kZWxpdmVyZWQsCiAgICBwLmJsb2NrZXJzLCBwLmZvbGxvd1VwLCBwLmNvbmZpZGVuY2UsIHAubm90ZXMsIG5ldyBEYXRlKCkudG9JU09TdHJpbmcoKQogIF0pOwogIHJldHVybiB7IHN0YXR1czogJ29rJyB9Owp9CgpmdW5jdGlvbiBoYW5kbGVTYXZlUHJvZmlsZShwKSB7CiAgY29uc3Qgc2hlZXQgPSBnZXRPckNyZWF0ZVNoZWV0KFNIRUVUX1BST0ZJTEUsIFsnbmFtZScsICd1cGRhdGVkQXQnXSk7CiAgc2hlZXQuYXBwZW5kUm93KFtwLm5hbWUsIG5ldyBEYXRlKCkudG9JU09TdHJpbmcoKV0pOwogIHJldHVybiB7IHN0YXR1czogJ29rJyB9Owp9CgovKioKICogTG9ncyBhIDUtbWludXRlIGNoZWNrLWluIOKAlCB0aGUgc2hvcnQgc3VydmV5IHRoYXQgYXV0by1vcGVucyBvbiB0aGUKICogY2xpZW50IHdoZW4gYSB0aW1ldGFibGUgYmxvY2sgaGFzIDUgbWludXRlcyBsZWZ0LiBBcHBlbmRlZCwgbm90CiAqIHVwc2VydGVkLCBzbyBhIGJsb2NrIHZpc2l0ZWQgbXVsdGlwbGUgdGltZXMgYWNyb3NzIGRpZmZlcmVudCBkYXlzCiAqIChvciByZS1hbnN3ZXJlZCB0aGUgc2FtZSBkYXkpIGtlZXBzIGl0cyBmdWxsIGhpc3RvcnkgcmF0aGVyIHRoYW4KICogb3ZlcndyaXRpbmcgdGhlIHByZXZpb3VzIGFuc3dlciDigJQgdW5saWtlIFRhc2tzL1RpbWV0YWJsZSByb3dzLAogKiB3aGljaCByZXByZXNlbnQgY3VycmVudCBzdGF0ZSwgZWFjaCBjaGVjay1pbiBpcyBpdHMgb3duIG1vbWVudCBpbgogKiB0aW1lIHdvcnRoIGtlZXBpbmcuCiAqLwpmdW5jdGlvbiBoYW5kbGVTYXZlQ2hlY2tpbihwKSB7CiAgY29uc3Qgc2hlZXQgPSBnZXRPckNyZWF0ZVNoZWV0KFNIRUVUX0NIRUNLSU5TLAogICAgWydkYXRlJywgJ2Jsb2NrJywgJ2Jsb2NrVGl0bGUnLCAnbW9vZCcsICdvblRyYWNrJywgJ2ZvY3VzJywgJ2VuZXJneScsICdibG9ja2VyJywgJ25vdGVzJywgJ3RpbWVzdGFtcCddKTsKICBzaGVldC5hcHBlbmRSb3coWwogICAgcC5kYXRlLCBwLmJsb2NrLCBwLmJsb2NrVGl0bGUsIHAubW9vZCwgcC5vblRyYWNrLAogICAgcC5mb2N1cywgcC5lbmVyZ3ksIHAuYmxvY2tlciwgcC5ub3RlcywgbmV3IERhdGUoKS50b0lTT1N0cmluZygpCiAgXSk7CiAgcmV0dXJuIHsgc3RhdHVzOiAnb2snIH07Cn0K";
+
+        async function maybeShowOnboarding() {
+            const settings = await getSettings();
+            if (settings.onboardingDone) return;
+            const overlay = document.getElementById('onboardingOverlay');
+            overlay.classList.remove('hidden'); overlay.classList.add('flex');
+        }
+        function showOnboardingNote(msg) {
+            const el = document.getElementById('onboardingError');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+        async function copyBackendScript() {
+            try {
+                const script = atob(BACKEND_SCRIPT_B64);
+                await navigator.clipboard.writeText(script);
+                showOnboardingNote('Copied — paste it into the Apps Script editor.');
+            } catch (e) {
+                showOnboardingNote("Couldn't copy automatically — your browser may be blocking clipboard access.");
+            }
+        }
+        async function testAndContinueOnboarding() {
+            const url = document.getElementById('onboardingUrlInput').value.trim();
+            const btn = document.getElementById('onboardingTestBtn');
+            if (!url) { showOnboardingNote('Paste your Apps Script Web App URL first, or tap Skip below.'); return; }
+            btn.textContent = 'Testing…';
+            try {
+                const res = await jsonp(url, { action: 'getSchedule' });
+                if (res.status !== 'ok') throw new Error(res.message || 'bad response');
+                const existing = await getSettings();
+                await setStore('settings', { ...existing, sheetsUrl: url, onboardingDone: true });
+                finishOnboarding();
+            } catch (e) {
+                showOnboardingNote("Couldn't reach that URL — check it's deployed as a Web App with 'Anyone' access, and that you copied the full /exec link.");
+            } finally {
+                btn.textContent = 'Test connection & continue';
+            }
+        }
+        async function skipOnboarding() {
+            const existing = await getSettings();
+            await setStore('settings', { ...existing, onboardingDone: true });
+            finishOnboarding();
+        }
+        function finishOnboarding() {
+            const overlay = document.getElementById('onboardingOverlay');
+            overlay.classList.add('hidden'); overlay.classList.remove('flex');
         }
         /* Builds a YYYY-MM-DD key from a Date's LOCAL fields — never via
            .toISOString(), which converts to UTC first. For any positive
@@ -1011,7 +1339,81 @@
 
         /* ================= Alarms & countdown ================= */
         const alarmedBlocks = new Set();
+
+        /* ---- Native background alarms (Android app build only) ----
+           setInterval(alarmTick, 5000) below only fires while this page
+           is the foreground tab/app — that's fine in a browser tab the
+           user keeps open, but Android suspends JS timers once the app
+           is backgrounded, so the in-browser alarm alone would silently
+           stop working the moment the phone screen locks. When running
+           inside the native Capacitor shell, window.Capacitor exists, so
+           we additionally schedule real OS-level notifications via
+           @capacitor/local-notifications for every remaining block's
+           5-minutes-left mark today — these fire even if the app isn't
+           open. This runs alongside (not instead of) the existing
+           alarmTick() loop, which still handles sound/vibration/opening
+           the check-in survey while the app IS in the foreground. */
+        function isNativePlatform() {
+            return typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+        }
+        /**
+         * Android 15+/16 render the WebView edge-to-edge under the status
+         * and navigation bars with no opt-out — this app's own dark
+         * background is what's actually behind those bars now, so their
+         * icons need to be styled to contrast against it (they otherwise
+         * default to a style meant for a light background and can render
+         * near-invisible). Confusingly, in this API "DARK" means "light
+         * icons for a dark background" (it names the resulting style, not
+         * the icon color) — this is the exact enum from @capacitor/core's
+         * own type definitions, not a guess.
+         */
+        async function styleSystemBarsForDarkTheme() {
+            if (!isNativePlatform()) return;
+            const SystemBars = window.Capacitor.Plugins && window.Capacitor.Plugins.SystemBars;
+            if (!SystemBars) return;
+            try { await SystemBars.setStyle({ style: 'DARK' }); }
+            catch (e) { console.error('SystemBars styling failed', e); }
+        }
+        function hashToNotifId(str) {
+            let h = 0;
+            for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+            return Math.abs(h) % 2147483647 || 1;
+        }
+        let nativeAlarmsScheduledFor = null;
+        async function scheduleNativeAlarms() {
+            if (!isNativePlatform()) return;
+            const LN = window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+            if (!LN) return;
+            try {
+                const perm = await LN.requestPermissions();
+                if (perm.display !== 'granted') return;
+                const pending = await LN.getPending();
+                if (pending.notifications && pending.notifications.length) {
+                    await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+                }
+                const now = new Date();
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                const todayStr = todayKey();
+                const notifications = SCHEDULE
+                    .filter(b => (b.end - 5) > nowMin)
+                    .map(b => {
+                        const fireAt = new Date();
+                        fireAt.setSeconds(0, 0);
+                        fireAt.setHours(0, 0, 0, 0);
+                        fireAt.setMinutes(b.end - 5);
+                        return {
+                            id: hashToNotifId(todayStr + ':' + b.id),
+                            title: '5 minutes left',
+                            body: b.title,
+                            schedule: { at: fireAt }
+                        };
+                    });
+                if (notifications.length) await LN.schedule({ notifications });
+                nativeAlarmsScheduledFor = todayStr;
+            } catch (e) { console.error('native alarm scheduling failed', e); }
+        }
         async function alarmTick() {
+            if (isNativePlatform() && nativeAlarmsScheduledFor !== todayKey()) scheduleNativeAlarms();
             const currentId = getCurrentBlockId();
             if (!currentId) return;
             const block = SCHEDULE.find(b => b.id === currentId);
@@ -1033,7 +1435,7 @@
             if (!isAnyOverlayOpen()) openCheckin(block);
         }
         function isAnyOverlayOpen() {
-            const ids = ['modalOverlay', 'reflectionOverlay', 'settingsOverlay', 'logTimeOverlay', 'overrideOverlay', 'monthReportOverlay', 'checkinOverlay'];
+            const ids = ['modalOverlay', 'reflectionOverlay', 'settingsOverlay', 'logTimeOverlay', 'overrideOverlay', 'monthReportOverlay', 'checkinOverlay', 'onboardingOverlay'];
             return ids.some(id => {
                 const el = document.getElementById(id);
                 return el && !el.classList.contains('hidden');
@@ -1111,8 +1513,9 @@
             });
 
             html += renderWeekHistory(await getWeekCompletionData());
-            container.innerHTML = html;
+            container.innerHTML = `<div id="timetableLeftCol">${html}</div><div id="desktopCalendarPanel" class="desktop-cal-panel"></div>`;
             tickCountdowns();
+            renderDesktopCalendarPanel();
 
             document.querySelectorAll('.checkbox-toggle').forEach(btn => {
                 btn.addEventListener('click', async () => {
@@ -1129,6 +1532,164 @@
                 btn.addEventListener('click', () => openOverride(btn.dataset.block, btn.dataset.title));
             });
         }
+
+        /* ================= Desktop calendar + history panel =================
+           Only visible at >=900px (see .desktop-cal-panel CSS) — right-hand
+           pane of the Timetable tab on desktop/tablet. Shows a real
+           calendar grid (schedule completion % per day) plus a combined,
+           clickable feed of past Reflections and Checkins. Clicking a day
+           filters the feed to that day; clicking a card expands its full
+           answers. This intentionally does NOT replace the mobile Month
+           Report modal — that's still used on narrow screens. */
+        let desktopCalOffset = 0;
+        let desktopCalSelectedDate = null;
+        function desktopCalMonthDate(offset) {
+            const d = new Date();
+            d.setDate(1);
+            d.setMonth(d.getMonth() + offset);
+            return d;
+        }
+        async function gatherHistoryForMonth(year, month, daysInMonth) {
+            const entries = [];
+            const tasks = await loadTasksCache();
+            tasks.forEach(t => {
+                if (!t.reflection) return;
+                const d = new Date(t.updatedAt || t.createdAt || Date.now());
+                if (d.getFullYear() !== year || d.getMonth() !== month) return;
+                entries.push({
+                    type: 'reflection', date: localDateKey(d), timestamp: t.updatedAt || t.createdAt,
+                    title: `${t.clientId} — ${t.description}`, mood: t.reflection.quality || '',
+                    qa: [
+                        ['How it went', t.reflection.quality], ['Delivered', t.reflection.delivered],
+                        ['Blockers', t.reflection.blockers], ['Follow-up needed', t.reflection.followUp],
+                        ['Confidence', t.reflection.confidence], ['Notes', t.reflection.notes]
+                    ].filter(([, v]) => v !== undefined && v !== '')
+                });
+            });
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = dateKeyFor(year, month, day);
+                const dayCheckins = await getStore('checkins:' + dateStr, {});
+                Object.keys(dayCheckins).forEach(blockId => {
+                    const c = dayCheckins[blockId];
+                    const block = SCHEDULE.find(b => b.id === blockId);
+                    entries.push({
+                        type: 'checkin', date: dateStr, timestamp: dateStr,
+                        title: block ? block.title : blockId, mood: c.mood || '',
+                        qa: [
+                            ['Mood', c.mood], ['On track', c.onTrack], ['Focus', c.focus],
+                            ['Energy', c.energy != null ? c.energy + '/5' : ''], ['Blocker', c.blocker], ['Notes', c.notes]
+                        ].filter(([, v]) => v !== undefined && v !== '')
+                    });
+                });
+            }
+            entries.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            return entries;
+        }
+        function renderHistoryFeedHtml(entries) {
+            if (!entries.length) {
+                return `<p class="text-xs" style="color:var(--ink-dimmer)">No reflections or check-ins ${desktopCalSelectedDate ? 'on this day' : 'this month'} yet.</p>`;
+            }
+            return entries.map((e, i) => `
+      <div class="history-card" data-idx="${i}">
+        <div class="flex items-center gap-2.5">
+          <div class="history-card-icon">${ICONS[e.type]}</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-medium truncate">${e.title}</p>
+            <p class="text-[10px] font-mono mt-0.5" style="color:var(--ink-dimmer)">${e.date} · ${e.type === 'reflection' ? 'Reflection' : 'Check-in'}</p>
+          </div>
+          <span class="shrink-0">${moodIconFor(e.mood)}</span>
+        </div>
+        <div class="history-card-body hidden mt-3">
+          ${e.qa.map(([label, val]) => `<div class="history-qa-row"><span style="color:var(--ink-dimmer)">${label}</span><span class="text-right" style="max-width:60%">${val}</span></div>`).join('')}
+        </div>
+      </div>`).join('');
+        }
+        async function renderDesktopCalendarPanel() {
+            // Skip the work entirely on mobile widths — this pane is hidden there.
+            if (!(window.matchMedia && window.matchMedia('(min-width: 900px)').matches)) return;
+            const panel = document.getElementById('desktopCalendarPanel');
+            if (!panel) return;
+
+            const base = desktopCalMonthDate(desktopCalOffset);
+            const year = base.getFullYear(), month = base.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstWeekday = new Date(year, month, 1).getDay();
+            const todayStr = todayKey();
+
+            const dayPct = {};
+            const dayHasHistory = {};
+            for (let d = 1; d <= daysInMonth; d++) {
+                const k = dateKeyFor(year, month, d);
+                const prog = await getStore('timetable:' + k, {});
+                const done = SCHEDULE.filter(item => prog[item.id]).length;
+                dayPct[k] = SCHEDULE.length ? Math.round((done / SCHEDULE.length) * 100) : 0;
+                const checkins = await getStore('checkins:' + k, {});
+                dayHasHistory[k] = Object.keys(checkins).length > 0;
+            }
+            const tasks = await loadTasksCache();
+            tasks.forEach(t => {
+                if (!t.reflection) return;
+                const d = new Date(t.updatedAt || t.createdAt || Date.now());
+                if (d.getFullYear() === year && d.getMonth() === month) dayHasHistory[localDateKey(d)] = true;
+            });
+
+            let cellsHtml = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => `<div class="cal-weekday">${w}</div>`).join('');
+            for (let i = 0; i < firstWeekday; i++) cellsHtml += `<div class="cal-day is-empty"></div>`;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const k = dateKeyFor(year, month, d);
+                const pct = dayPct[k] || 0;
+                cellsHtml += `
+      <div class="cal-day ${k === todayStr ? 'is-today' : ''} ${k === desktopCalSelectedDate ? 'is-selected' : ''}" data-date="${k}">
+        ${dayHasHistory[k] ? '<span class="cal-day-dot"></span>' : ''}
+        <span class="cal-day-num">${d}</span>
+        <span class="cal-day-bar"><span class="cal-day-bar-fill" style="width:${pct}%"></span></span>
+      </div>`;
+            }
+
+            const entries = await gatherHistoryForMonth(year, month, daysInMonth);
+            const filtered = desktopCalSelectedDate ? entries.filter(e => e.date === desktopCalSelectedDate) : entries;
+
+            panel.innerHTML = `
+      <div class="glass rounded-2xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <button id="calPrevMonth" class="glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <p class="font-display text-sm font-medium">${base.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</p>
+          <button id="calNextMonth" class="glass rounded-full w-8 h-8 flex items-center justify-center active:scale-90 transition-transform ${desktopCalOffset >= 0 ? 'opacity-30 pointer-events-none' : ''}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="cal-grid">${cellsHtml}</div>
+      </div>
+      <div class="mt-5">
+        <div class="flex items-center justify-between mb-2.5">
+          <p class="text-[11px] uppercase tracking-[0.18em] font-mono" style="color:var(--ink-dimmer)">
+            ${desktopCalSelectedDate ? 'Reflections & check-ins — ' + desktopCalSelectedDate : 'Reflections & check-ins this month'}
+          </p>
+          ${desktopCalSelectedDate ? `<button id="calClearFilter" class="text-[11px] font-mono underline underline-offset-2" style="color:var(--ink-dim)">Clear</button>` : ''}
+        </div>
+        ${renderHistoryFeedHtml(filtered)}
+      </div>`;
+
+            panel.querySelectorAll('.cal-day[data-date]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const k = el.dataset.date;
+                    desktopCalSelectedDate = (desktopCalSelectedDate === k) ? null : k;
+                    renderDesktopCalendarPanel();
+                });
+            });
+            const clearBtn = document.getElementById('calClearFilter');
+            if (clearBtn) clearBtn.addEventListener('click', () => { desktopCalSelectedDate = null; renderDesktopCalendarPanel(); });
+            const prevBtn = document.getElementById('calPrevMonth');
+            if (prevBtn) prevBtn.addEventListener('click', () => { desktopCalOffset--; desktopCalSelectedDate = null; renderDesktopCalendarPanel(); });
+            const nextBtn = document.getElementById('calNextMonth');
+            if (nextBtn) nextBtn.addEventListener('click', () => { if (desktopCalOffset < 0) { desktopCalOffset++; desktopCalSelectedDate = null; renderDesktopCalendarPanel(); } });
+            panel.querySelectorAll('.history-card').forEach(card => {
+                card.addEventListener('click', () => card.querySelector('.history-card-body').classList.toggle('hidden'));
+            });
+        }
+
         async function getWeekCompletionData() {
             const keys = dateKeysBack(7);
             const data = [];
@@ -1197,8 +1758,19 @@
             alert: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>',
             clock: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
             edit: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-            trash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6"/></svg>'
+            trash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6"/></svg>',
+            reflection: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+            checkin: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+            moodGreat: '<svg width="11" height="11" viewBox="0 0 24 24" fill="#f5f5f3" stroke="none"><circle cx="12" cy="12" r="10"/></svg>',
+            moodOkay: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><circle cx="12" cy="12" r="9" stroke-dasharray="14 8"/></svg>',
+            moodLow: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f5f5f3" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>'
         };
+        function moodIconFor(value) {
+            const v = (value || '').toLowerCase();
+            if (v.includes('great') || v === 'yes' || v === 'fully focused') return ICONS.moodGreat;
+            if (v.includes('okay') || v.includes('partial') || v.includes('bit more') || v.includes('some')) return ICONS.moodOkay;
+            return ICONS.moodLow;
+        }
         function taskTotalMinutes(task) { return (task.timeLog || []).reduce((s, e) => s + e.minutes, 0); }
         function weekMinutesForTasks(tasks) {
             const keys = new Set(dateKeysBack(7));
@@ -1414,13 +1986,78 @@
         /* ================= Swap / Override modal ================= */
         let activeOverrideBlockId = null;
         let activeOverridePlannedTitle = null;
+        let selectedOverrideTaskId = null;
+
+        function blockDurationMinutes(blockId) {
+            const b = SCHEDULE.find(x => x.id === blockId);
+            return b ? Math.max(0, b.end - b.start) : 0;
+        }
+
+        /**
+         * Adds (or, with a negative delta, removes) minutes from a task's
+         * timeLog entry for a specific date. Used to log a swapped block's
+         * duration against a linked client task, and to cleanly reverse
+         * that same amount if the link is changed or cleared later —
+         * unlike logMinutesToTask() (used by the manual +15m/+30m/custom
+         * Log Time modal), this never lets an entry go negative and
+         * removes the entry entirely once it nets to zero.
+         */
+        async function adjustTaskMinutesForDate(taskId, date, deltaMinutes) {
+            if (!taskId || !deltaMinutes) return;
+            const tasks = await loadTasksCache();
+            const t = tasks.find(x => x.id === taskId);
+            if (!t) return;
+            t.timeLog = t.timeLog || [];
+            const entry = t.timeLog.find(e => e.date === date);
+            if (entry) {
+                entry.minutes = Math.max(0, entry.minutes + deltaMinutes);
+                if (entry.minutes === 0) t.timeLog = t.timeLog.filter(e => e !== entry);
+            } else if (deltaMinutes > 0) {
+                t.timeLog.push({ date, minutes: deltaMinutes });
+            }
+            t.updatedAt = new Date().toISOString();
+            await persistTasksCache();
+            sheetsCall('upsertTask', { id: t.id, clientId: t.clientId, description: t.description, startDate: t.startDate, endDate: t.endDate, status: normalizedStatus(t), totalMinutes: taskTotalMinutes(t) });
+        }
+
+        async function renderOverrideTaskList() {
+            const tasks = await loadTasksCache();
+            const active = tasks.filter(t => normalizedStatus(t) !== 'done')
+                .sort((a, b) => b.startDate.localeCompare(a.startDate));
+            const wrap = document.getElementById('overrideTaskList');
+            const durationMin = blockDurationMinutes(activeOverrideBlockId);
+            if (!active.length) {
+                wrap.innerHTML = `<p class="text-[11px]" style="color:var(--ink-dimmer)">No active client tasks yet.</p>`;
+                return;
+            }
+            wrap.innerHTML = active.map(t => `
+      <button type="button" class="override-task-row ${selectedOverrideTaskId === t.id ? 'active' : ''}" data-id="${t.id}">
+        <span class="override-task-label"><span class="font-mono" style="color:var(--ink-dimmer)">${t.clientId}</span> — ${t.description}</span>
+        <span class="override-task-hours">${minutesToLabel(durationMin)}</span>
+      </button>`).join('');
+            wrap.querySelectorAll('.override-task-row').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    selectedOverrideTaskId = (selectedOverrideTaskId === id) ? null : id;
+                    if (selectedOverrideTaskId) {
+                        const t = active.find(x => x.id === selectedOverrideTaskId);
+                        if (t) document.getElementById('overrideInput').value = `${t.clientId} — ${t.description}`;
+                    }
+                    renderOverrideTaskList();
+                });
+            });
+        }
+
         async function openOverride(blockId, plannedTitle) {
             activeOverrideBlockId = blockId;
             activeOverridePlannedTitle = plannedTitle;
             const overrides = await getStore('override:' + todayKey(), {});
             const existing = overrides[blockId];
+            selectedOverrideTaskId = (existing && existing.taskId) ? existing.taskId : null;
             document.getElementById('overridePlanned').textContent = 'Planned: ' + plannedTitle;
+            document.getElementById('overrideBlockDuration').textContent = 'Block duration: ' + minutesToLabel(blockDurationMinutes(blockId));
             document.getElementById('overrideInput').value = existing ? existing.actualTitle : '';
+            await renderOverrideTaskList();
             const overlay = document.getElementById('overrideOverlay');
             overlay.classList.remove('hidden'); overlay.classList.add('flex');
             gsap.fromTo(overlay.firstElementChild, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: 'power3.out' });
@@ -1429,28 +2066,66 @@
             document.getElementById('overrideOverlay').classList.add('hidden');
             document.getElementById('overrideOverlay').classList.remove('flex');
             activeOverrideBlockId = null;
+            selectedOverrideTaskId = null;
         }
         async function saveOverride() {
             if (!activeOverrideBlockId) return;
-            const val = document.getElementById('overrideInput').value.trim();
-            if (!val) { closeOverride(); return; }
             const overrides = await getStore('override:' + todayKey(), {});
-            overrides[activeOverrideBlockId] = { actualTitle: val, plannedTitle: activeOverridePlannedTitle, updatedAt: new Date().toISOString() };
+            const existing = overrides[activeOverrideBlockId];
+            const typed = document.getElementById('overrideInput').value.trim();
+
+            let taskLabel = '';
+            if (selectedOverrideTaskId) {
+                const tasks = await loadTasksCache();
+                const t = tasks.find(x => x.id === selectedOverrideTaskId);
+                if (t) taskLabel = `${t.clientId} — ${t.description}`;
+            }
+            const val = typed || taskLabel;
+            if (!val) { closeOverride(); return; }
+
+            const durationMin = blockDurationMinutes(activeOverrideBlockId);
+            const prevTaskId = (existing && existing.taskId) ? existing.taskId : null;
+            const prevLogged = (existing && existing.loggedMinutes) ? existing.loggedMinutes : 0;
+
+            // Only re-log if the linked task actually changed — resaving
+            // with the same link (e.g. just editing the note text) must
+            // not double-count the block's duration.
+            let newLoggedMinutes = prevLogged;
+            if (selectedOverrideTaskId !== prevTaskId) {
+                if (prevTaskId && prevLogged) await adjustTaskMinutesForDate(prevTaskId, todayKey(), -prevLogged);
+                newLoggedMinutes = 0;
+                if (selectedOverrideTaskId) {
+                    await adjustTaskMinutesForDate(selectedOverrideTaskId, todayKey(), durationMin);
+                    newLoggedMinutes = durationMin;
+                }
+            }
+
+            overrides[activeOverrideBlockId] = {
+                actualTitle: val, plannedTitle: activeOverridePlannedTitle,
+                taskId: selectedOverrideTaskId || null, loggedMinutes: newLoggedMinutes,
+                updatedAt: new Date().toISOString()
+            };
             await setStore('override:' + todayKey(), overrides);
             const progress = await getStore('timetable:' + todayKey(), {});
             sheetsCall('logOverride', { date: todayKey(), block: activeOverrideBlockId, plannedTitle: activeOverridePlannedTitle, actualTitle: val, completed: !!progress[activeOverrideBlockId] });
             closeOverride();
             renderTimetable();
+            renderClientTasks();
         }
         async function clearOverride() {
             if (!activeOverrideBlockId) return;
             const overrides = await getStore('override:' + todayKey(), {});
+            const existing = overrides[activeOverrideBlockId];
+            if (existing && existing.taskId && existing.loggedMinutes) {
+                await adjustTaskMinutesForDate(existing.taskId, todayKey(), -existing.loggedMinutes);
+            }
             delete overrides[activeOverrideBlockId];
             await setStore('override:' + todayKey(), overrides);
             const progress = await getStore('timetable:' + todayKey(), {});
             sheetsCall('logOverride', { date: todayKey(), block: activeOverrideBlockId, plannedTitle: activeOverridePlannedTitle, actualTitle: '', completed: !!progress[activeOverrideBlockId] });
             closeOverride();
             renderTimetable();
+            renderClientTasks();
         }
 
         /* ================= Reflection wizard ================= */
@@ -1752,8 +2427,8 @@
         /* ================= Settings ================= */
         async function openSettings() {
             const settings = await getSettings();
-            document.getElementById('inputSheetsUrl').value = settings.sheetsUrl === DEFAULT_SHEETS_URL ? '' : (settings.sheetsUrl || '');
-            document.getElementById('inputSheetsUrl').placeholder = DEFAULT_SHEETS_URL;
+            document.getElementById('inputSheetsUrl').value = settings.sheetsUrl || '';
+            document.getElementById('inputSheetsUrl').placeholder = 'https://script.google.com/macros/s/.../exec';
             document.getElementById('inputAlarmUrl').value = settings.alarmUrl || '';
             const lastSynced = await getStore('schedule-last-synced', null);
             document.getElementById('scheduleSyncedText').textContent = formatLastSynced(lastSynced);
@@ -1772,8 +2447,11 @@
             initBlobs();
             initTabs();
             document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+            await maybeShowOnboarding();
+            await styleSystemBarsForDarkTheme();
 
             await initSchedule();
+            await scheduleNativeAlarms();
             await autoMergeFromSheets();
             await renderTimetable();
             await renderClientTasks();
@@ -1786,6 +2464,12 @@
             setInterval(tickCountdowns, 1000);
             setInterval(alarmTick, 5000);
             setInterval(retryQueue, 45000);
+            if (window.matchMedia) {
+                const desktopMq = window.matchMedia('(min-width: 900px)');
+                const onBreakpointChange = () => renderDesktopCalendarPanel();
+                if (desktopMq.addEventListener) desktopMq.addEventListener('change', onBreakpointChange);
+                else if (desktopMq.addListener) desktopMq.addListener(onBreakpointChange);
+            }
 
             document.getElementById('fabAdd').addEventListener('click', () => openModal(null));
             document.getElementById('modalClose').addEventListener('click', closeModal);
@@ -1816,13 +2500,17 @@
                 renderClientTasks();
             });
 
+            document.getElementById('copyBackendScriptBtn').addEventListener('click', copyBackendScript);
+            document.getElementById('onboardingTestBtn').addEventListener('click', testAndContinueOnboarding);
+            document.getElementById('onboardingSkipBtn').addEventListener('click', skipOnboarding);
+
             document.getElementById('settingsBtn').addEventListener('click', openSettings);
             document.getElementById('settingsClose').addEventListener('click', closeSettings);
             document.getElementById('retrySyncBtn').addEventListener('click', retryQueue);
             document.getElementById('restoreBtn').addEventListener('click', restoreFromSheets);
             document.getElementById('refreshScheduleBtn').addEventListener('click', async () => {
                 const fetched = await fetchAndCacheSchedule(true);
-                if (fetched && fetched.length) { SCHEDULE = fetched; await renderTimetable(); }
+                if (fetched && fetched.length) { SCHEDULE = fetched; await renderTimetable(); await scheduleNativeAlarms(); }
                 const lastSynced = await getStore('schedule-last-synced', null);
                 document.getElementById('scheduleSyncedText').textContent = formatLastSynced(lastSynced);
             });
@@ -1843,7 +2531,8 @@
             document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
                 const url = document.getElementById('inputSheetsUrl').value.trim();
                 const alarmUrl = document.getElementById('inputAlarmUrl').value.trim();
-                await setStore('settings', { sheetsUrl: url || DEFAULT_SHEETS_URL, alarmUrl });
+                const existing = await getSettings();
+                await setStore('settings', { ...existing, sheetsUrl: url, alarmUrl, onboardingDone: true });
                 closeSettings();
                 retryQueue();
             });
